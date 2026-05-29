@@ -16,13 +16,32 @@
 - **الحكم:** الكود سليم، الوثيقة النصية فقط غير دقيقة. **لا إصلاح كود
   مطلوب**، لكن يُنصح بتحديث الوثيقة لتجنّب تضليل وكلاء مستقبليين.
 
-### D-2: codepage الطابعة — cp1251 vs cp1256 ⚠️
-- **المصدر الأصلي (`strings.xml`):** `<string name="codepage">cp1251</string>`.
-- **كود app1:** يستخدم **cp1256** (الصحيح للعربية).
-- **الحكم:** ⚠️ **يحتاج تأكيد ميداني.** cp1251 سيريلي (روسي) — لا يدعم
-  العربية. cp1256 عربي. الأرجح أن مورد `cp1251` خطأ قديم في التطبيق
-  الأصلي (أو الطابعة تتجاهله). app1 على الأرجح **صحيح بـ cp1256**، لكن
-  يجب اختبار طباعة فعلية للتأكيد. سؤال للمستخدم عند اختبار الطابعة.
+### D-2: codepage الطابعة — cp1251 vs cp1256 ✅ محسوم
+- **المصدر الأصلي (`strings.xml`):** `<string name="codepage">cp1251</string>`
+  — **مورد مضلِّل/غير مستخدم للنص العربي.**
+- **الكود الفعلي (`printer/bluetooth/PrinterActivity.java:322`):**
+  ```java
+  byte[] bytes = " السلام عليكم".getBytes(Charset.forName("Windows-1256"));
+  ```
+- **الحكم:** ✅ **النص العربي يُرمَّز فعلياً بـ Windows-1256 (= cp1256).**
+  مورد `cp1251` في strings.xml لا يُستخدم لترميز العربي (الكود يستدعي
+  `Charset.forName("Windows-1256")` صراحةً). **app1 كان صحيحاً بـ cp1256.**
+  لا حاجة لتغيير، لكن نُبقي الترميز قابلاً للضبط احتياطاً.
+
+### D-2b: موديل الطابعة الفعلي — BIXOLON SPP-R310 🆕
+- **المصدر الأصلي (`printer/driver/PrinterDriverFactory.java`):** مصنع
+  drivers يختار حسب الموديل المخزّن (`TAPreferences.getSetectedPrinterModel`):
+  - `"DPP-250"` → `DatecsDpp250Driver` (type 1)
+  - `"UNS-SP1B"` → `DatecsDpp250Driver` (type 2)
+  - `"BlueTooth Printer"` → `JP5802Driver` (type 3)
+  - default → `JP5802Driver`
+- **الواقع الميداني (أكّده المستخدم):** الطابعة المستخدمة هي
+  **BIXOLON SPP-R310** (طابعة حرارية محمولة، ESC/POS، Bluetooth).
+- **الحكم:** SPP-R310 طابعة ESC/POS قياسية تدعم cp1256 عربي. التطبيق الأصلي
+  لا يحوي driver باسمها صراحةً، فالأرجح كانت تُستخدم عبر مسار
+  `"BlueTooth Printer"` العام (JP5802/ESC-POS عبر RFCOMM). **التصميم في app3:**
+  مجرّد طابعة ESC/POS عبر Bluetooth SPP + cp1256 + Arabic shaper — متوافق
+  تماماً مع SPP-R310. يُختبر ميدانياً عند أول طباعة.
 
 ### D-3: غلاف الاستجابة `{OperationName}Result`
 - **المصدر الأصلي:** كل استجابة مُغلَّفة (`GetListReadingCounterResult`,

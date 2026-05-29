@@ -28,7 +28,7 @@
 | الشبكة | Axios + interceptors | يُرحَّل + envelope/appId |
 | التحقق | Zod (`*Loose` coercers) | يُرحَّل (صحيح) |
 | الترجمة | i18next (491 مفتاح، RTL) | يُرحَّل |
-| الطباعة | ESC/POS + Datecs DPP-250 | يُرحَّل (⚠️ codepage) |
+| الطباعة | ESC/POS + Bluetooth SPP، cp1256 | يُرحَّل (الطابعة الميدانية: **BIXOLON SPP-R310**) |
 | البناء/النشر | **Expo EAS + GitHub Actions** | يُنشَأ جديداً |
 
 > **ملاحظة EAS:** المشروع bare RN؛ سنستخدم EAS Build مع `expo-dev-client`

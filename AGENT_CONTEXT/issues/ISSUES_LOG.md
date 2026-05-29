@@ -215,6 +215,41 @@
 
 ---
 
+## ISS-13 — "ما تظهر بيانات" رغم "متصل" (القراءات/السندات/الرئيسية = 0)
+- **المشكلة:** الجهاز يعرض "متصل" بس كل العدّادات صفر (سندات 0، قراءات 0،
+  عدّادات الرئيسية 0) — أثبتته لقطات المستخدم.
+- **السبب الجذري (تأكّد 100% من الكود المفكوك v28):** الخادم WCF يفلتر كل قوائمه
+  حسب الجابي المسجّل. التطبيق القديم يرسل بارامترات أساسية على كل طلب:
+  - `GetListReadingCounter` (ListReadingActivity.java سطر 110،123):
+    `id = appConfig.getUser().getNou()` + `appId = appConfig.getAppId()`.
+  - `GetListBonds`/`GetListBondsPayment` (ListBondsActivity.java سطر 184-194):
+    `nou=NOU` + `sdate`/`edate` (صيغة `dd/MM/yyyy`) + `num_s=NOA` (إذا SYS!=1) + `appId`.
+  تطبيقنا كان يستدعي **بدون أي بارامتر** → الخادم يرجّع قائمة فاضية = "ما تظهر بيانات".
+  زيادةً: `toAuthUser` كان **يهمل NOU/NOA/SYS** ولا يخزّنها، و`/Authenticate`
+  ينشئ `minimalUser` بدون NOU إطلاقاً.
+- **الحل:**
+  - `stores/authStore.ts`: `AuthUser` صار فيه `nou/noa/sys`؛ `toAuthUser` يملأها؛
+    بعد `/Authenticate` الناجح نستدعي `hydrateIdentityFromRoster()` (getListUsers +
+    مطابقة username) لجلب NOU الحقيقي؛ وكل مسارات الدخول (Authenticate، /Login،
+    dev-bypass، cold-restart) تستدعي `persistCollectorIdentity()`.
+  - `services/storage/prefs.ts`: مفاتيح + دوال `getCollectorNou/Noa/Sys`،
+    `setCollectorIdentity`، `clearCollectorIdentity` (يُمسح عند logout) — تخزين
+    MMKV تقرأه طبقة الـ sync عديمة الحالة.
+  - `services/sync/pull/requestScope.ts` (جديد): `readingListParams()`
+    (id=NOU+appId) و`bondListParams()` (nou+sdate+edate+num_s+appId، نافذة 5 سنوات)
+    و`toApiDate()` بصيغة `dd/MM/yyyy` المطابقة لـ Utils.getDateFormatApi().
+  - `readingPullHandler.ts` + `referencePullHandlers.ts`: كل طلبات القوائم تمرّر الآن
+    الـ params (القوائم المرجعية تمرّر appId).
+  - dev-bypass: `sys=1` فيشوف كل البيانات بلا فلترة NOA (سلوك admin).
+- **الوقاية:** أي endpoint جديد يفلتر حسب الجابي لازم يستهلك `requestScope`؛
+  ممنوع استدعاء قائمة بدون appId.
+- **ملاحظة معلّقة:** طلب المستخدم "الدخول يقبل الاسم+كلمة المرور ويدخل حتى لو غلط" —
+  بعدها لازم نراجعها مع سلوك جلب NOU (لو دخل باسم غلط ما راح يطابق روستر = NOU=0).
+- **مرجع:** `ListReadingActivity.java`، `ListBondsActivity.java`، `Utils.java`،
+  `entities/Users.java`، `AppConfig.java`.
+
+---
+
 ## (قالب لإدخال جديد — انسخه)
 <!--
 ## ISS-N — العنوان

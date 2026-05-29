@@ -68,6 +68,14 @@ export const PREF_KEYS = {
   // Auth UX
   LAST_LOGIN_AT: 'auth.last_login_at',
 
+  // Collector identity (legacy Users.NOU/NOA/SYS) — drives data-scoping
+  // filters on GetListReadingCounter (id=NOU) and GetListBonds (nou=NOU,
+  // num_s=NOA when SYS!=1). Without these the server returns an empty list
+  // for a regular collector — see ListReadingActivity / ListBondsActivity.
+  COLLECTOR_NOU: 'auth.collector_nou',
+  COLLECTOR_NOA: 'auth.collector_noa',
+  COLLECTOR_SYS: 'auth.collector_sys',
+
   // Misc
   ANALYTICS_ID: 'misc.analytics_id', // pseudo-anonymous device id for sync logs
 } as const;
@@ -156,6 +164,52 @@ export function setSecureIdOverride(value: string): void {
     return;
   }
   storage.set(PREF_KEYS.SECURE_ID_OVERRIDE, trimmed);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Collector identity (NOU / NOA / SYS)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Mirrors legacy `AppConfig.getUser().getNou()/getNOA()/getSYS()`. These are
+// the data-scoping keys the legacy app appends to every list request:
+//   • GetListReadingCounter → id = NOU
+//   • GetListBonds          → nou = NOU, num_s = NOA (when SYS !== 1)
+// We persist them at login time so the stateless sync layer can read them
+// without depending on the (in-memory) Zustand auth store.
+
+/** The logged-in collector's NOU (user serial). 0/null when unknown. */
+export function getCollectorNou(): number | null {
+  const v = storage.getNumber(PREF_KEYS.COLLECTOR_NOU);
+  return v == null || v === 0 ? null : v;
+}
+
+/** The logged-in collector's NOA (account/branch serial). 0/null when unknown. */
+export function getCollectorNoa(): number | null {
+  const v = storage.getNumber(PREF_KEYS.COLLECTOR_NOA);
+  return v == null || v === 0 ? null : v;
+}
+
+/** 1 when the logged-in user is a SYS/admin (sees ALL data, no NOA filter). */
+export function getCollectorSys(): number {
+  return storage.getNumber(PREF_KEYS.COLLECTOR_SYS) ?? 0;
+}
+
+/** Persist the collector identity after a successful login. */
+export function setCollectorIdentity(opts: {
+  nou: number;
+  noa: number;
+  sys: number;
+}): void {
+  storage.set(PREF_KEYS.COLLECTOR_NOU, opts.nou);
+  storage.set(PREF_KEYS.COLLECTOR_NOA, opts.noa);
+  storage.set(PREF_KEYS.COLLECTOR_SYS, opts.sys);
+}
+
+/** Clear the collector identity on logout. */
+export function clearCollectorIdentity(): void {
+  storage.delete(PREF_KEYS.COLLECTOR_NOU);
+  storage.delete(PREF_KEYS.COLLECTOR_NOA);
+  storage.delete(PREF_KEYS.COLLECTOR_SYS);
 }
 
 /**

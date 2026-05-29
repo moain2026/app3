@@ -32,6 +32,7 @@ import { parseReadingList } from '../../api/mappers';
 import type { ItemReadingDto } from '../../api/schemas/reading';
 import { prefs } from '../../storage';
 import type { PullHandler, PullResult } from '../types';
+import { readingListParams } from './requestScope';
 
 const log = logger.scope('Pull.Reading');
 const COLLECTION = 'readings';
@@ -79,7 +80,12 @@ export const readingPullHandler: PullHandler = {
     const collection = database.collections.get<Reading>(COLLECTION);
 
     // ── 1. Fetch from server ────────────────────────────────────────────
-    const raw = await api.call('getListReadingCounter');
+    // MUST send id=NOU + appId — without them the legacy WCF backend returns
+    // an empty list for a collector (the "no data shows" bug). See
+    // ListReadingActivity.java + requestScope.readingListParams().
+    const params = readingListParams();
+    log.info('reading pull params', params);
+    const raw = await api.call('getListReadingCounter', { params });
     const dtos = parseReadingList(raw);
     log.info('pulled readings', { count: dtos.length });
 

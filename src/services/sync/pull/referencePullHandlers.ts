@@ -41,8 +41,16 @@ import {
 } from '../../api/mappers';
 import { prefs } from '../../storage';
 import type { PullHandler, PullResult } from '../types';
+import { appIdParam, bondListParams } from './requestScope';
 
 const log = logger.scope('Pull.Reference');
+
+// Reference lists are scoped only by appId (branch). The legacy lookups
+// (LookupPleasesActivity etc.) always append it; omitting it can yield an
+// empty list on some deployments.
+function refParams(): Record<string, string | number> {
+  return { appId: appIdParam() };
+}
 
 // ─── Shared: delete-then-insert in a single transaction ───────────────────
 /**
@@ -63,7 +71,7 @@ export const accountPullHandler: PullHandler = {
   entity: 'accounts',
   async run(): Promise<PullResult> {
     const startedAt = Date.now();
-    const raw = await api.call('getListAccounts');
+    const raw = await api.call('getListAccounts', { params: refParams() });
     const accounts = parseAccountList(raw);
     log.debug('accounts fetched', { count: accounts.length });
 
@@ -104,7 +112,7 @@ export const placePullHandler: PullHandler = {
     const startedAt = Date.now();
     // For now we fetch the broad GetListPlaces. Permission-filtered
     // GetListUserPlaces will be wired up in Phase 5 once auth is in place.
-    const raw = await api.call('getListPlaces');
+    const raw = await api.call('getListPlaces', { params: refParams() });
     const places = parsePlaceList(raw);
     log.debug('places fetched', { count: places.length });
 
@@ -134,7 +142,7 @@ export const groupPullHandler: PullHandler = {
   entity: 'groups',
   async run(): Promise<PullResult> {
     const startedAt = Date.now();
-    const raw = await api.call('getListGroup');
+    const raw = await api.call('getListGroup', { params: refParams() });
     const groups = parseTGroupList(raw);
     const tblhs = parseTblhList(raw);
     log.info('groups + tblh fetched', { groups: groups.length, tblhs: tblhs.length });
@@ -210,7 +218,7 @@ export const userPullHandler: PullHandler = {
   entity: 'users',
   async run(): Promise<PullResult> {
     const startedAt = Date.now();
-    const raw = await api.call('getListUsers');
+    const raw = await api.call('getListUsers', { params: refParams() });
     const users = parseUserList(raw);
     log.debug('users fetched', { count: users.length });
 
@@ -248,7 +256,7 @@ export const companyPullHandler: PullHandler = {
   entity: 'company',
   async run(): Promise<PullResult> {
     const startedAt = Date.now();
-    const raw = await api.call('getCompanyData');
+    const raw = await api.call('getCompanyData', { params: refParams() });
     const info = parseCompanyInfo(raw);
 
     const collection = database.collections.get<CompanyInfo>('company_info');
@@ -278,7 +286,9 @@ export const bondPullHandler: PullHandler = {
   entity: 'bonds',
   async run(): Promise<PullResult> {
     const startedAt = Date.now();
-    const raw = await api.call('getListBonds');
+    const params = bondListParams();
+    log.info('bonds pull params', params);
+    const raw = await api.call('getListBonds', { params });
     const bonds = parseBondList(raw);
 
     const collection = database.collections.get<Bond>('bonds');
@@ -366,7 +376,9 @@ export const bondPaymentPullHandler: PullHandler = {
   entity: 'bond_payments',
   async run(): Promise<PullResult> {
     const startedAt = Date.now();
-    const raw = await api.call('getListBondsPayment');
+    const params = bondListParams();
+    log.info('bond payments pull params', params);
+    const raw = await api.call('getListBondsPayment', { params });
     const payments = parseBondPaymentList(raw);
 
     const collection = database.collections.get<BondPayment>('bond_payments');

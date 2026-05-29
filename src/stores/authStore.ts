@@ -22,6 +22,7 @@
 import { create } from 'zustand';
 
 import { api } from '@/services/api';
+import { parseUserList } from '@/services/api/mappers';
 import {
   AccessTokenResponseSchema,
   AuthenticateResponseSchema,
@@ -49,6 +50,8 @@ import {
   getBaseUrl,
   getBranchNumber,
   setLastLoginAt,
+  setCollectorIdentity,
+  clearCollectorIdentity,
 } from '@/services/storage/prefs';
 import { logger } from '@/utils/logger';
 
@@ -67,6 +70,16 @@ export interface AuthUser {
   name?: string;
   email?: string;
   phone?: string;
+  /**
+   * Collector serial (legacy Users.NOU). This is the PRIMARY data-scoping
+   * key the legacy app sends on every list request (id=NOU for readings,
+   * nou=NOU for bonds). Without it the server returns an empty list.
+   */
+  nou?: number;
+  /** Account/branch serial (legacy Users.NOA) — used as num_s for non-SYS. */
+  noa?: number;
+  /** 1 when SYS/admin (sees ALL data, skips the NOA filter). */
+  sys?: number;
   permissions: {
     canDelete: boolean;
     canEdit: boolean;
@@ -136,6 +149,9 @@ function toAuthUser(raw: LoginUserResponse, username: string): AuthUser {
     name: raw.name,
     email: raw.email,
     phone: raw.phone,
+    nou: raw.NOU ?? undefined,
+    noa: raw.NOA ?? undefined,
+    sys: raw.SYS === true ? 1 : 0,
     permissions: {
       canDelete: raw.DE === true,
       canEdit: raw.ED === true,
@@ -145,6 +161,69 @@ function toAuthUser(raw: LoginUserResponse, username: string): AuthUser {
       isAdmin: raw.SYS === true,
     },
   };
+}
+
+/**
+ * Persist the collector identity (NOU/NOA/SYS) so the stateless sync layer
+ * can scope list requests. Called after EVERY successful login path
+ * (Authenticate→hydrate, /Login, dev-bypass). Safe to call with 0s — the
+ * sync layer treats 0/null NOU as "no scope" and the request degrades to
+ * the legacy admin behavior.
+ */
+function persistCollectorIdentity(user: AuthUser): void {
+  setCollectorIdentity({
+    nou: user.nou ?? 0,
+    noa: user.noa ?? 0,
+    sys: user.sys ?? 0,
+  });
+}
+
+/**
+ * After /Authenticate (which returns only a token), hydrate the full
+ * identity by fetching the user roster and matching on username. This
+ * mirrors the legacy app, which stored the Users object (incl. NOU) right
+ * after auth. Best-effort: on any failure we keep the minimal user and the
+ * NOU stays 0 (admin-ish fallback).
+ */
+async function hydrateIdentityFromRoster(
+  username: string,
+): Promise<Partial<AuthUser> | null> {
+  try {
+    const raw = await api.call('getListUsers', {
+      params: { appId: getBranchNumber() },
+    });
+    const users = parseUserList(raw);
+    const uname = username.trim().toLowerCase();
+    const match =
+      users.find(u => (u.username ?? '').trim().toLowerCase() === uname) ??
+      null;
+    if (!match) {
+      log.warn('hydrate: no roster match for username', { username });
+      return null;
+    }
+    return {
+      id: match.remoteId,
+      name: match.fullName ?? undefined,
+      phone: match.phone ?? undefined,
+      email: match.email ?? undefined,
+      nou: match.nou,
+      noa: match.noa,
+      sys: match.sys ? 1 : 0,
+      permissions: {
+        canDelete: match.de,
+        canEdit: match.ed,
+        canViewReports: match.rep,
+        canViewAllReadings: match.sK,
+        canViewAllSubscribers: match.sS,
+        isAdmin: match.sys,
+      },
+    };
+  } catch (err) {
+    log.warn('hydrate: getListUsers failed', {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────
@@ -244,6 +323,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           setLastUsername(bypassUser.username),
         ]);
         setLastLoginAt(new Date());
+        persistCollectorIdentity(bypassUser);
       } catch (err) {
         // Token-write failures are non-fatal in bypass mode — the in-memory
         // session is still valid and the operator can still drive the UI.
@@ -323,10 +403,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (parsed.success && parsed.data.length > 0) {
         const access = parsed.data;
         // /Authenticate gives us a token but no Users payload — mint a
-        // minimal AuthUser. A subsequent /GetListUsers call (Wave 3) will
-        // hydrate the full identity and permission flags. For now we let
-        // the operator into the app with conservative defaults.
-        const minimalUser: AuthUser = {
+        // minimal AuthUser, then HYDRATE the full identity (incl. NOU) from
+        // /GetListUsers so the sync layer can scope list requests. Without
+        // NOU, GetListReadingCounter/GetListBonds return empty lists.
+        let resolvedUser: AuthUser = {
           username,
           permissions: {
             canDelete: false,
@@ -338,6 +418,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           },
         };
 
+        // The roster fetch needs the token to be present on outbound
+        // requests, so persist it BEFORE hydrating.
         await Promise.all([
           setAccessToken(access),
           setRefreshToken(access), // /Authenticate has no separate refresh
@@ -345,8 +427,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         ]);
         setLastLoginAt(new Date());
 
+        const hydrated = await hydrateIdentityFromRoster(username);
+        if (hydrated) {
+          resolvedUser = { ...resolvedUser, ...hydrated };
+        }
+        persistCollectorIdentity(resolvedUser);
+
         set({
-          user: minimalUser,
+          user: resolvedUser,
           accessToken: access,
           refreshToken: access,
           isAuthenticated: true,
@@ -355,7 +443,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           lastLoginError: null,
           isDevBypass: false,
         });
-        log.info('STAGE 1 — /Authenticate success', { username });
+        log.info('STAGE 1 — /Authenticate success', {
+          username,
+          nou: resolvedUser.nou ?? 0,
+          sys: resolvedUser.sys ?? 0,
+        });
         // Wave 7 P1: kick a non-blocking pull of reference + collector
         // data so the user lands on a hot cache. Dev-bypass never gets
         // here (handled in the bypass branch above).
@@ -452,6 +544,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       const authUser = toAuthUser(u, username);
+      persistCollectorIdentity(authUser);
 
       await Promise.all([
         setAccessToken(access),
@@ -507,6 +600,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // ─── logout ─────────────────────────────────────────────────────────
   async logout() {
     await clearAllAuthCredentials();
+    clearCollectorIdentity();
     set({
       user: null,
       accessToken: null,
@@ -571,6 +665,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // `login()` minted. We do NOT contact the network here.
     if (access === DEV_BYPASS_ACCESS_TOKEN) {
       const bypassUser = createDevBypassUser();
+      persistCollectorIdentity(bypassUser);
       set({
         user: bypassUser,
         accessToken: access,

@@ -94,6 +94,12 @@ export function createDevBypassUser(): AuthUser {
     name: 'مطوّر النظام (Dev Mode)',
     email: 'dev@local.app',
     phone: '',
+    // SYS=1 so the bypass user behaves like an admin: list requests are NOT
+    // scoped by NOU/NOA and the server returns ALL data (matches legacy SYS
+    // behavior). nou/noa are synthetic and unused while sys=1.
+    nou: 0,
+    noa: 0,
+    sys: 1,
     permissions: {
       canDelete: true,
       canEdit: true,

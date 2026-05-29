@@ -697,10 +697,16 @@
     "actionsSection": "إجراءات",
     "username": "اسم المستخدم",
     "branch": "الفرع",
+    "branchValue": "الفرع رقم {{number}}",
     "lastLogin": "آخر تسجيل دخول",
+    "scope": "نطاق الجباية",
+    "scopeValue": "NOU: {{nou}} · NOA: {{noa}}",
+    "roleAdmin": "مشرف",
+    "roleCollector": "جابي",
     "changePassword": "تغيير كلمة المرور",
     "changePin": "تغيير رمز PIN",
     "logout": "تسجيل الخروج",
+    "logoutConfirm": "هل تريد تسجيل الخروج من الحساب؟",
     "actionsHint": "ستُفعّل هذه الإجراءات في المرحلة B."
   }
 }

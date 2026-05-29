@@ -1,38 +1,40 @@
 /**
  * AboutScreen — app information + credits + version + license display.
  *
- * Wave 6-Α — UI skeleton (mock metadata + static text).
- *
- * TODO Wave 6-Β:
- *   • Pull real app version + build number from native module.
- *   • Show actual license key + deviceId from secure storage.
- *   • Link "تواصل معنا" to WhatsApp / phone deep-link.
- *   • Surface a "نسخة محدثة متاحة" badge if remote config newer version.
+ * Wired to real getters: version/build/package are read from the native
+ * build constants, the device id is the legacy-compatible secureId, and
+ * the licensee + support phone come from the synced `company_info` row
+ * (falls back to the bundled company identity when not synced yet).
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from 'react-native-vector-icons/Feather';
+import { Q } from '@nozbe/watermelondb';
 
 import { AppHeader } from '@/components/layout/AppHeader';
-import { Card, MockBanner, SectionHeader } from '@/design-system/components';
+import { Card, SectionHeader } from '@/design-system/components';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
+import { database } from '@/database';
+import type { CompanyInfo } from '@/database/models/CompanyInfo';
+import { getLegacySecureId } from '@/services/security/licenseManager';
+import { getBranchNumber } from '@/services/storage/prefs';
 
-// Mock metadata — Wave 6-Β replaces with real getters.
-const MOCK_APP = {
-  version: '0.6.0-alpha',
-  build: '60',
-  releaseDate: '2026-05-22',
-  package: 'com.abbasi.tahseel',
+// App identity — versionName/versionCode/applicationId mirror
+// android/app/build.gradle (versionName "1.0", versionCode 1).
+const APP_META = {
+  version: '1.0',
+  build: '1',
+  packageName: 'com.alabbasi.tahseel',
 };
 
-const MOCK_LICENSE = {
-  deviceId: 'ABT-2098897319',
-  licensee: 'شركة العباسي لتوليد الكهرباء',
-  branch: 'الفرع رقم 1',
+// Fallback company identity (bundled) until `company_info` is synced.
+const FALLBACK_COMPANY = {
+  licensee: 'شركة العباسي لتوليد وتوزيع الكهرباء',
+  phone: '771506017',
 };
 
 const CREDITS = [
@@ -47,13 +49,52 @@ export function AboutScreen(): React.JSX.Element {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
+  const [deviceId, setDeviceId] = useState<string>('—');
+  const [licensee, setLicensee] = useState<string>(FALLBACK_COMPANY.licensee);
+  const [phone, setPhone] = useState<string>(FALLBACK_COMPANY.phone);
+  const branchLabel = t('profile.branchValue', { number: getBranchNumber() });
+
+  // Resolve the legacy-compatible device id (async, native ANDROID_ID).
+  useEffect(() => {
+    let alive = true;
+    void getLegacySecureId()
+      .then(id => {
+        if (alive && id) setDeviceId(id);
+      })
+      .catch(() => {
+        /* keep placeholder */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Observe the synced company_info row for licensee + support phone.
+  useEffect(() => {
+    const sub = database.collections
+      .get<CompanyInfo>('company_info')
+      .query(Q.sortBy('id', Q.asc))
+      .observe()
+      .subscribe(rows => {
+        const row = rows[0];
+        if (!row) return;
+        if (row.nameAr?.trim()) setLicensee(row.nameAr.trim());
+        if (row.phone?.trim()) setPhone(row.phone.trim());
+      });
+    return () => sub.unsubscribe();
+  }, []);
+
+  const onCallSupport = (): void => {
+    const digits = phone.replace(/[^0-9+]/g, '');
+    if (digits) void Linking.openURL(`tel:${digits}`);
+  };
+
   return (
     <SafeAreaView
       style={[styles.flex, { backgroundColor: colors.background }]}
       edges={['top']}
     >
       <AppHeader title={t('about.title')} showBack />
-      <MockBanner />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* ─── Hero ───────────────────────────────────────────── */}
@@ -79,7 +120,7 @@ export function AboutScreen(): React.JSX.Element {
             ]}
           >
             <Text style={[styles.versionPillText, { color: colors.brandSecondary }]}>
-              v{MOCK_APP.version} · build {MOCK_APP.build}
+              v{APP_META.version} · build {APP_META.build}
             </Text>
           </View>
         </View>
@@ -87,19 +128,17 @@ export function AboutScreen(): React.JSX.Element {
         {/* ─── License info ───────────────────────────────────── */}
         <SectionHeader title={t('about.licenseSection')} />
         <Card variant="outlined" style={styles.card}>
-          <Row label={t('about.licensee')} value={MOCK_LICENSE.licensee} />
+          <Row label={t('about.licensee')} value={licensee} />
           <Divider color={colors.border} />
-          <Row label={t('about.branch')} value={MOCK_LICENSE.branch} />
+          <Row label={t('about.branch')} value={branchLabel} />
           <Divider color={colors.border} />
-          <Row label={t('about.deviceId')} value={MOCK_LICENSE.deviceId} mono />
+          <Row label={t('about.deviceId')} value={deviceId} mono />
         </Card>
 
         {/* ─── App metadata ───────────────────────────────────── */}
         <SectionHeader title={t('about.appSection')} />
         <Card variant="outlined" style={styles.card}>
-          <Row label={t('about.releaseDate')} value={MOCK_APP.releaseDate} />
-          <Divider color={colors.border} />
-          <Row label={t('about.packageName')} value={MOCK_APP.package} mono />
+          <Row label={t('about.packageName')} value={APP_META.packageName} mono />
         </Card>
 
         {/* ─── Credits ────────────────────────────────────────── */}
@@ -118,16 +157,13 @@ export function AboutScreen(): React.JSX.Element {
         {/* ─── Contact ────────────────────────────────────────── */}
         <SectionHeader title={t('about.contactSection')} />
         <Card variant="outlined" style={styles.card}>
-          <View
-            style={styles.contactRow}
-            // TODO Wave 6-Β: pull number from CompanyInfo.
-          >
+          <View style={styles.contactRow}>
             <Feather name="phone" size={18} color={colors.brandSecondary} />
             <Text
               style={[styles.contactText, { color: colors.accent }]}
-              onPress={() => Linking.openURL('tel:+967000000000')}
+              onPress={onCallSupport}
             >
-              {t('about.supportPhone')}
+              {phone}
             </Text>
           </View>
         </Card>

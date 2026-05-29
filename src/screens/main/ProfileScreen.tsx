@@ -1,49 +1,70 @@
 /**
  * ProfileScreen — current operator's profile.
  *
- * Wave 6-Α — UI skeleton (mock user + disabled actions).
- *
- * Sections:
- *   • Hero (avatar + name + branch)
- *   • Account info (username, role, branch, last login)
- *   • Actions (change password, change PIN, logout)
- *
- * TODO Wave 6-Β:
- *   • Pull operator data from authStore (Zustand).
- *   • Wire "change password" → calls ReSetPassword endpoint.
- *   • Wire "change PIN" → updates secure storage.
- *   • Wire logout → authStore.logout() + nav reset to Auth.
+ * Wired to the real authStore (Zustand) + prefs. Shows the logged-in
+ * collector's name / username / branch / NOU-NOA scope and performs a
+ * real logout (clears tokens + collector identity; the root navigator
+ * reacts to the auth state change and resets to the Auth stack).
  */
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from 'react-native-vector-icons/Feather';
 
 import { AppHeader } from '@/components/layout/AppHeader';
 import {
   Card,
-  MockBanner,
   SecondaryButton,
   SectionHeader,
 } from '@/design-system/components';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
+import { useAuthStore } from '@/stores/authStore';
+import { getBranchNumber } from '@/services/storage/prefs';
 
-// Mock user — Wave 6-Β: replace with useAuthStore().
-const MOCK_USER = {
-  name: 'معين العباسي',
-  username: 'mu3ayyad',
-  role: 'مسؤول الجباية',
-  branch: 'الفرع رقم 1',
-  lastLogin: '2026-05-21 17:42',
-  initials: 'مع',
-};
+/** Derive 1–2 initials from the operator's display name. */
+function deriveInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '؟';
+  if (parts.length === 1) return parts[0].slice(0, 2);
+  return parts[0].charAt(0) + parts[1].charAt(0);
+}
 
 export function ProfileScreen(): React.JSX.Element {
   const { t } = useTranslation();
   const { colors } = useTheme();
+
+  const user = useAuthStore(s => s.user);
+  const logout = useAuthStore(s => s.logout);
+
+  const displayName = user?.name?.trim() || user?.username || '—';
+  const username = user?.username ?? '—';
+  const branchNumber = getBranchNumber();
+  const branchLabel = t('profile.branchValue', { number: branchNumber });
+  const initials = deriveInitials(displayName);
+  // SYS=1 means an admin/supervisor scope; otherwise a field collector.
+  const roleLabel =
+    user?.sys === 1 ? t('profile.roleAdmin') : t('profile.roleCollector');
+
+  const onLogout = (): void => {
+    Alert.alert(
+      t('profile.logout'),
+      t('profile.logoutConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('profile.logout'),
+          style: 'destructive',
+          onPress: () => {
+            void logout();
+          },
+        },
+      ],
+      { cancelable: true },
+    );
+  };
 
   return (
     <SafeAreaView
@@ -51,7 +72,6 @@ export function ProfileScreen(): React.JSX.Element {
       edges={['top']}
     >
       <AppHeader title={t('profile.title')} showBack />
-      <MockBanner />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* ─── Hero ───────────────────────────────────────────── */}
@@ -65,14 +85,14 @@ export function ProfileScreen(): React.JSX.Element {
             <Text
               style={[styles.avatarText, { color: colors.brandSecondary }]}
             >
-              {MOCK_USER.initials}
+              {initials}
             </Text>
           </View>
           <Text style={[styles.userName, { color: colors.textPrimary }]}>
-            {MOCK_USER.name}
+            {displayName}
           </Text>
           <Text style={[styles.userRole, { color: colors.textSecondary }]}>
-            {MOCK_USER.role} · {MOCK_USER.branch}
+            {roleLabel} · {branchLabel}
           </Text>
         </View>
 
@@ -82,19 +102,22 @@ export function ProfileScreen(): React.JSX.Element {
           <Row
             icon="user"
             label={t('profile.username')}
-            value={MOCK_USER.username}
+            value={username}
           />
           <Divider color={colors.border} />
           <Row
             icon="briefcase"
             label={t('profile.branch')}
-            value={MOCK_USER.branch}
+            value={branchLabel}
           />
           <Divider color={colors.border} />
           <Row
-            icon="clock"
-            label={t('profile.lastLogin')}
-            value={MOCK_USER.lastLogin}
+            icon="hash"
+            label={t('profile.scope')}
+            value={t('profile.scopeValue', {
+              nou: user?.nou ?? 0,
+              noa: user?.noa ?? 0,
+            })}
           />
         </Card>
 
@@ -103,43 +126,13 @@ export function ProfileScreen(): React.JSX.Element {
         <Card variant="outlined" style={styles.card}>
           <View style={styles.actionsList}>
             <SecondaryButton
-              title={t('profile.changePassword')}
-              icon="key"
-              variant="outlined"
-              onPress={() => {
-                // TODO Wave 6-Β: open change-password sheet → call ReSetPassword.
-              }}
-              disabled
-            />
-            <SecondaryButton
-              title={t('profile.changePin')}
-              icon="lock"
-              variant="outlined"
-              onPress={() => {
-                // TODO Wave 6-Β: open change-PIN sheet → secure storage.
-              }}
-              disabled
-            />
-            <SecondaryButton
               title={t('profile.logout')}
               icon="log-out"
               variant="danger"
-              onPress={() => {
-                // TODO Wave 6-Β: useAuthStore.getState().logout()
-              }}
-              disabled
+              onPress={onLogout}
             />
           </View>
         </Card>
-
-        <View style={styles.footerHint}>
-          <Feather name="info" size={12} color={colors.textTertiary} />
-          <Text
-            style={[styles.footerHintText, { color: colors.textTertiary }]}
-          >
-            {t('profile.actionsHint')}
-          </Text>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );

@@ -105,7 +105,7 @@ export function toBondListItem(bond: Bond, lookups: BondLookups): MockBond {
     bondType: bond.bondType === 'payment' ? 'payment' : 'receipt',
     accountId: bond.accountId ?? 0,
     accountName: bond.accountName ?? account?.name ?? '',
-    accountNum: account?.code ?? '',
+    accountNum: account?.noadad ?? '',
     currencyId: bond.currencyId ?? 0,
     currencySymbol: currency?.symbol ?? '?',
     amount: bond.amount,

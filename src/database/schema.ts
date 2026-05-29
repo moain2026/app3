@@ -23,7 +23,7 @@
 
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const schema = appSchema({
   version: SCHEMA_VERSION,
@@ -133,15 +133,23 @@ export const schema = appSchema({
      * ════════════════════════════════════════════════════════════════════ */
     tableSchema({
       name: 'accounts',
+      // ⭐ Columns mirror entities/Accounts.java (v28) VERBATIM — ISS-12.
+      //   num name namet namep noadad nog nomstlm notblh balance dain mden
+      //   tel type
       columns: [
-        { name: 'remote_id', type: 'number', isIndexed: true },
-        { name: 'code', type: 'string', isIndexed: true },
-        { name: 'name', type: 'string', isIndexed: true },
-        { name: 'name_en', type: 'string', isOptional: true },
-        { name: 'balance', type: 'number' },
-        { name: 'currency_id', type: 'number', isOptional: true },
-        { name: 'phone', type: 'string', isOptional: true },
-        { name: 'address', type: 'string', isOptional: true },
+        { name: 'num', type: 'number', isIndexed: true }, // remote id / sequence
+        { name: 'name', type: 'string', isIndexed: true }, // account name
+        { name: 'namet', type: 'string', isOptional: true }, // alias name
+        { name: 'namep', type: 'string', isOptional: true }, // parent/place name
+        { name: 'noadad', type: 'string', isOptional: true, isIndexed: true }, // meter/account code
+        { name: 'nog', type: 'number' }, // group number
+        { name: 'nomstlm', type: 'number' }, // receiver/area number
+        { name: 'notblh', type: 'number' }, // book/tabla number
+        { name: 'balance', type: 'number' }, // running balance
+        { name: 'dain', type: 'number' }, // debit total
+        { name: 'mden', type: 'number' }, // credit total
+        { name: 'tel', type: 'string', isOptional: true }, // phone
+        { name: 'type', type: 'number' }, // account type
 
         // Read-only mirror (server is source of truth for accounts).
         { name: 'last_synced_at', type: 'number', isOptional: true },

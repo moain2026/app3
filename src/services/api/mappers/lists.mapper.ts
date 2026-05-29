@@ -82,27 +82,50 @@ export function parseCompanyInfo(raw: unknown): CompanyInfoDomain {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export interface AccountDomain {
-  remoteId: number;
-  code: string;
+  /** Backend `num`. */
+  num: number;
+  /** Backend `name`. */
   name: string;
-  nameEn: string | null;
+  /** Backend `namet` — alias. */
+  namet: string | null;
+  /** Backend `namep` — parent/place name. */
+  namep: string | null;
+  /** Backend `noadad` — meter/account code. */
+  noadad: string | null;
+  /** Backend `nog`. */
+  nog: number;
+  /** Backend `nomstlm`. */
+  nomstlm: number;
+  /** Backend `notblh`. */
+  notblh: number;
+  /** Backend `balance`. */
   balance: number;
-  currencyId: number | null;
-  phone: string | null;
-  address: string | null;
+  /** Backend `dain` — debit. */
+  dain: number;
+  /** Backend `mden` — credit. */
+  mden: number;
+  /** Backend `tel` — phone. */
+  tel: string | null;
+  /** Backend `type`. */
+  type: number;
 }
 
 export function parseAccountList(raw: unknown): AccountDomain[] {
   return unwrapList(AccountListResponseSchema, AccountDtoSchema, raw).map(
     (dto): AccountDomain => ({
-      remoteId: dto.id,
-      code: dto.code,
+      num: dto.num,
       name: dto.name,
-      nameEn: dto.name_en ?? null,
+      namet: dto.namet ?? null,
+      namep: dto.namep ?? null,
+      noadad: dto.noadad ?? null,
+      nog: dto.nog,
+      nomstlm: dto.nomstlm,
+      notblh: dto.notblh,
       balance: dto.balance,
-      currencyId: dto.currency_id ?? null,
-      phone: dto.phone ?? null,
-      address: dto.address ?? null,
+      dain: dto.dain,
+      mden: dto.mden,
+      tel: dto.tel ?? null,
+      type: dto.type,
     }),
   );
 }

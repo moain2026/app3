@@ -57,7 +57,7 @@ async function doSeed(): Promise<void> {
     return;
   }
   const existing = await collection
-    .query(Q.where('remote_id', sentinel.id))
+    .query(Q.where('num', sentinel.id))
     .fetch();
   if (existing.length > 0) {
     log.debug('seedAccounts: already populated, skip');
@@ -69,15 +69,19 @@ async function doSeed(): Promise<void> {
     await database.write(async () => {
       const creates = MOCK_ACCOUNTS.map((mock) =>
         collection.prepareCreate((row) => {
-          row.remoteId = mock.id;
-          row.code = mock.num;
+          row.num = mock.id; // legacy `num` = the account record id
+          row.noadad = mock.num; // visible meter/account code
           row.name = mock.name;
-          row.nameEn = mock.nameT ?? null;
+          row.namet = mock.nameT ?? null;
+          row.namep = mock.placeName ?? null;
+          row.nog = mock.groupId ?? 0;
+          row.nomstlm = mock.placeId ?? 0;
+          row.notblh = 0;
           row.balance = mock.balance;
-          row.currencyId = mock.currencyId;
-          row.phone = mock.phone ?? null;
-          // address is not in the mock — leave null.
-          row.address = null;
+          row.dain = mock.balance > 0 ? mock.balance : 0;
+          row.mden = mock.balance < 0 ? -mock.balance : 0;
+          row.tel = mock.phone ?? null;
+          row.type = 0;
           row.lastSyncedAt = new Date();
         }),
       );

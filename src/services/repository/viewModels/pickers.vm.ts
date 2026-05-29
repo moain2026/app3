@@ -52,24 +52,27 @@ export function toMockPlaces(rows: Place[]): MockPlace[] {
  * once `accounts.tblh_id` is wired to the live pull.
  */
 export function toMockAccount(a: Account): MockAccount {
-  const mock = MOCK_ACCOUNTS.find((m) => m.id === a.remoteId);
+  const mock = MOCK_ACCOUNTS.find((m) => m.id === a.num);
   const base: MockAccount = {
-    id: a.remoteId,
-    num: a.code,
+    id: a.num, // backend `num` = the account record id
+    num: a.noadad ?? '', // backend `noadad` = visible meter/account code
     name: a.name,
-    placeId: mock?.placeId ?? 0,
-    placeName: mock?.placeName ?? '',
-    groupId: mock?.groupId ?? 0,
+    // placeName / groupName are joined server-side in the legacy app; until
+    // we wire the live join (via nomstlm/notblh → places/tblh) we fall back
+    // to the static mock table, keyed by num.
+    placeId: a.nomstlm || (mock?.placeId ?? 0),
+    placeName: mock?.placeName ?? a.namep ?? '',
+    groupId: a.nog || (mock?.groupId ?? 0),
     groupName: mock?.groupName ?? '',
     balance: a.balance,
-    currencyId: a.currencyId ?? 1,
+    currencyId: mock?.currencyId ?? 1,
     active: mock?.active ?? true,
   };
-  if (a.nameEn != null && a.nameEn !== '') {
-    base.nameT = a.nameEn;
+  if (a.namet != null && a.namet !== '') {
+    base.nameT = a.namet;
   }
-  if (a.phone != null && a.phone !== '') {
-    base.phone = a.phone;
+  if (a.tel != null && a.tel !== '') {
+    base.phone = a.tel;
   }
   return base;
 }

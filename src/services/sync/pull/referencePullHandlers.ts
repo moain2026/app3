@@ -72,14 +72,19 @@ export const accountPullHandler: PullHandler = {
       await clearTable('accounts');
       for (const dto of accounts) {
         await collection.create(row => {
-          row.remoteId = dto.remoteId;
-          row.code = dto.code;
+          row.num = dto.num;
           row.name = dto.name;
-          row.nameEn = dto.nameEn;
+          row.namet = dto.namet;
+          row.namep = dto.namep;
+          row.noadad = dto.noadad;
+          row.nog = dto.nog;
+          row.nomstlm = dto.nomstlm;
+          row.notblh = dto.notblh;
           row.balance = dto.balance;
-          row.currencyId = dto.currencyId;
-          row.phone = dto.phone;
-          row.address = dto.address;
+          row.dain = dto.dain;
+          row.mden = dto.mden;
+          row.tel = dto.tel;
+          row.type = dto.type;
           row.lastSyncedAt = new Date();
         });
       }

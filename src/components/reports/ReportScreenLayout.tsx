@@ -3,32 +3,33 @@
  *
  * Mounts:
  *   • AppHeader with showBack
- *   • MockBanner (DEV only)
  *   • Filters card (period + optional extras)
  *   • Summary / KPI card (optional)
- *   • Body (the report table)
- *   • Bottom action bar — disabled "تصدير PDF" + "طباعة" buttons (Wave 6-Β)
+ *   • Body (the report table) with loading / error / empty states
+ *   • Bottom action bar — "تصدير PDF" + "طباعة"
  *
- * Wave 6-Α — UI skeleton component.
- *
- * TODO Wave 6-Β:
- *   • Wire export-to-PDF action.
- *   • Wire print action via PrinterService.
- *   • Add real period filtering against WatermelonDB.
+ * The host screen owns the data-fetch (via `useReportData`) and feeds the
+ * layout `loading` / `error` / `onRetry`. Period changes bubble up through
+ * `onPeriodChange` so the host can re-query the server.
  */
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Feather from 'react-native-vector-icons/Feather';
 
 import { AppHeader } from '@/components/layout/AppHeader';
 import { PeriodPicker, type PeriodValue } from '@/components/pickers';
 import {
   Card,
+  ErrorBanner,
   FormField,
-  MockBanner,
   SecondaryButton,
 } from '@/design-system/components';
 import { useTheme } from '@/design-system/theme';
@@ -44,6 +45,14 @@ export interface ReportScreenLayoutProps {
   summary?: React.ReactNode;
   /** Main body (the report table). */
   children: React.ReactNode;
+  /** Notifies the host when the user picks a new period (to re-query). */
+  onPeriodChange?: (period: PeriodValue) => void;
+  /** True while the report request is in flight (renders a spinner). */
+  loading?: boolean;
+  /** Non-empty error message renders an ErrorBanner with a retry button. */
+  error?: string | null;
+  /** Retry handler wired to the ErrorBanner. */
+  onRetry?: () => void;
 }
 
 const PERIOD_LABEL: Record<PeriodValue['preset'], string> = {
@@ -58,7 +67,17 @@ const PERIOD_LABEL: Record<PeriodValue['preset'], string> = {
 export function ReportScreenLayout(
   props: ReportScreenLayoutProps,
 ): React.JSX.Element {
-  const { title, subtitle, showPeriod = true, summary, children } = props;
+  const {
+    title,
+    subtitle,
+    showPeriod = true,
+    summary,
+    children,
+    onPeriodChange,
+    loading = false,
+    error = null,
+    onRetry,
+  } = props;
   const { t } = useTranslation();
   const { colors } = useTheme();
 
@@ -71,7 +90,15 @@ export function ReportScreenLayout(
       edges={['top']}
     >
       <AppHeader title={title} showBack />
-      <MockBanner />
+
+      {error ? (
+        <ErrorBanner
+          message={error}
+          variant="error"
+          onRetry={onRetry}
+          retryLabel={t('common.retry')}
+        />
+      ) : null}
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {subtitle ? (
@@ -97,7 +124,16 @@ export function ReportScreenLayout(
         {summary}
 
         {/* ─── Body ───────────────────────────────────────────── */}
-        <View style={styles.body}>{children}</View>
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={colors.brandPrimary} />
+            <Text style={[styles.loadingText, { color: colors.textTertiary }]}>
+              {t('common.loading')}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.body}>{children}</View>
+        )}
       </ScrollView>
 
       {/* ─── Bottom action bar ──────────────────────────────── */}
@@ -137,17 +173,10 @@ export function ReportScreenLayout(
           onSelect={(p) => {
             setPeriod(p);
             setPeriodOpen(false);
+            onPeriodChange?.(p);
           }}
           onClose={() => setPeriodOpen(false)}
         />
-      ) : null}
-
-      {/* DEV badge — proves we're in mock mode. */}
-      {__DEV__ ? (
-        <View style={styles.devTag}>
-          <Feather name="info" size={10} color="#856404" />
-          <Text style={styles.devTagText}>UI skeleton — Wave 6-Α</Text>
-        </View>
       ) : null}
     </SafeAreaView>
   );
@@ -164,21 +193,13 @@ const styles = StyleSheet.create({
   body: {
     marginTop: spacing[3],
   },
-  devTag: {
+  loadingBox: {
     alignItems: 'center',
-    backgroundColor: '#FFF3CD',
-    bottom: 80,
-    end: spacing[3],
-    flexDirection: 'row',
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    position: 'absolute',
+    gap: spacing[2],
+    paddingVertical: spacing[8],
   },
-  devTagText: {
-    color: '#856404',
-    fontSize: 9,
-    fontWeight: '700',
+  loadingText: {
+    fontSize: 12,
   },
   filtersCard: {
     marginBottom: spacing[2],

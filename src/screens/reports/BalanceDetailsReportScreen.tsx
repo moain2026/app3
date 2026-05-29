@@ -1,44 +1,68 @@
 /**
  * BalanceDetailsReportScreen — "كشف حساب تفصيلي".
  *
- * Shows the date-ordered ledger for ONE account (debit/credit/running
- * balance). Backed by the future GetRepBalanceDetailsByDate endpoint.
+ * Date-ordered ledger for ONE account. Backed by the live
+ * GetRepBalanceDetailsByDate endpoint (BalanceStateDetails rows:
+ * mdate/nref/name/dain/mden/rsed). `dain` = دائن/له (credit),
+ * `mden` = مدين/عليه (debit), `rsed` = running balance, `nref` = doc ref.
  *
- * Wave 6-Α — UI skeleton (mock rows from MOCK_BALANCE_DETAILS).
- *
- * TODO Wave 6-Β:
- *   • Require AccountPicker to be set before the table renders.
- *   • Replace MOCK_BALANCE_DETAILS with WatermelonDB query joined on bonds.
- *   • Add running-balance footer + opening-balance header row.
- *   • Wire export-PDF + print actions.
+ * The user must pick an account; until then we show an empty prompt.
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AccountPicker } from '@/components/pickers';
+import type { PeriodValue } from '@/components/pickers';
 import { ReportScreenLayout } from '@/components/reports/ReportScreenLayout';
 import { ReportTable } from '@/components/reports/ReportTable';
-import { Card, FormField } from '@/design-system/components';
+import { Card, EmptyState, FormField } from '@/design-system/components';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
-import { MOCK_ACCOUNTS, MOCK_BALANCE_DETAILS, type MockAccount } from '@/mocks';
+import {
+  useReportData,
+  numField,
+  strField,
+  periodToRange,
+} from '@/hooks/useReportData';
+import { repBalanceDetailsParams } from '@/services/sync/pull/requestScope';
+import type { ReportRow } from '@/services/api/schemas/reports';
+import type { MockAccount } from '@/mocks/accounts';
 
 export function BalanceDetailsReportScreen(): React.JSX.Element {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
-  // Default to first mock account so the report has something to show.
-  const [account, setAccount] = useState<MockAccount | null>(
-    MOCK_ACCOUNTS[0] ?? null,
-  );
+  const [account, setAccount] = useState<MockAccount | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [period, setPeriod] = useState<PeriodValue>({ preset: 'thisMonth' });
+
+  const accountNum = account?.num ?? '';
+
+  const buildParams = useCallback(() => {
+    const range = periodToRange(period);
+    return repBalanceDetailsParams(accountNum, range);
+  }, [accountNum, period]);
+
+  // Only fetch once an account is chosen.
+  const enabled = accountNum !== '';
+  const { rows, loading, error, refetch } = useReportData(
+    'getRepBalanceDetailsByDate',
+    buildParams,
+    [accountNum, period, enabled],
+  );
+
+  const showTable = enabled && (loading || rows.length > 0);
 
   return (
     <ReportScreenLayout
       title={t('reports.entries.BalanceDetailsReport.title')}
       subtitle={t('reports.entries.BalanceDetailsReport.subtitle')}
+      loading={enabled ? loading : false}
+      error={enabled ? error : null}
+      onRetry={refetch}
+      onPeriodChange={setPeriod}
       summary={
         <Card variant="outlined" style={styles.accountCard}>
           <FormField
@@ -59,7 +83,7 @@ export function BalanceDetailsReportScreen(): React.JSX.Element {
                   styles.balanceValue,
                   {
                     color:
-                      account.balance >= 0 ? colors.danger : colors.success,
+                      account.balance >= 0 ? colors.danger : colors.accent,
                   },
                 ]}
               >
@@ -70,45 +94,80 @@ export function BalanceDetailsReportScreen(): React.JSX.Element {
         </Card>
       }
     >
-      <ReportTable
-        data={MOCK_BALANCE_DETAILS}
-        keyExtractor={(r, i) => `${r.docNo}-${i}`}
-        columns={[
-          { key: 'date', label: t('reports.columns.date'), width: 100, accessor: (r) => r.date },
-          { key: 'doc', label: t('reports.columns.docNo'), width: 100, accessor: (r) => r.docNo },
-          { key: 'desc', label: t('reports.columns.description'), width: 170, accessor: (r) => r.description },
-          {
-            key: 'debit',
-            label: t('reports.columns.debit'),
-            width: 90,
-            render: (r) => (
-              <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '600' }}>
-                {r.debit > 0 ? r.debit.toLocaleString('en-US') : '—'}
-              </Text>
-            ),
-          },
-          {
-            key: 'credit',
-            label: t('reports.columns.credit'),
-            width: 90,
-            render: (r) => (
-              <Text style={{ color: colors.success, fontSize: 12, fontWeight: '600' }}>
-                {r.credit > 0 ? r.credit.toLocaleString('en-US') : '—'}
-              </Text>
-            ),
-          },
-          {
-            key: 'bal',
-            label: t('reports.columns.balance'),
-            width: 100,
-            render: (r) => (
-              <Text style={{ color: colors.textPrimary, fontSize: 12, fontWeight: '700' }}>
-                {r.balance.toLocaleString('en-US')}
-              </Text>
-            ),
-          },
-        ]}
-      />
+      {!enabled ? (
+        <EmptyState
+          icon="user"
+          title={t('reports.fields.account')}
+          subtitle={t('pickers.account.searchPlaceholder')}
+        />
+      ) : !loading && rows.length === 0 ? (
+        <EmptyState
+          icon="inbox"
+          title={t('reports.empty.title')}
+          subtitle={t('reports.empty.subtitle')}
+        />
+      ) : showTable ? (
+        <ReportTable<ReportRow>
+          data={rows}
+          keyExtractor={(r, i) => `${strField(r, 'nref')}-${i}`}
+          columns={[
+            {
+              key: 'date',
+              label: t('reports.columns.date'),
+              width: 100,
+              accessor: (r) => strField(r, 'mdate'),
+            },
+            {
+              key: 'doc',
+              label: t('reports.columns.docNo'),
+              width: 90,
+              accessor: (r) => strField(r, 'nref'),
+            },
+            {
+              key: 'desc',
+              label: t('reports.columns.description'),
+              width: 150,
+              accessor: (r) => strField(r, 'name'),
+            },
+            {
+              key: 'debit',
+              label: t('reports.columns.debit'),
+              width: 90,
+              render: (r) => {
+                const v = numField(r, 'mden');
+                return (
+                  <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '600' }}>
+                    {v > 0 ? v.toLocaleString('en-US') : '—'}
+                  </Text>
+                );
+              },
+            },
+            {
+              key: 'credit',
+              label: t('reports.columns.credit'),
+              width: 90,
+              render: (r) => {
+                const v = numField(r, 'dain');
+                return (
+                  <Text style={{ color: colors.accent, fontSize: 12, fontWeight: '600' }}>
+                    {v > 0 ? v.toLocaleString('en-US') : '—'}
+                  </Text>
+                );
+              },
+            },
+            {
+              key: 'bal',
+              label: t('reports.columns.balance'),
+              width: 100,
+              render: (r) => (
+                <Text style={{ color: colors.textPrimary, fontSize: 12, fontWeight: '700' }}>
+                  {numField(r, 'rsed').toLocaleString('en-US')}
+                </Text>
+              ),
+            },
+          ]}
+        />
+      ) : null}
 
       <AccountPicker
         visible={pickerOpen}

@@ -1,28 +1,29 @@
 /**
  * ExpensesReportScreen — "المصروفات اليومية".
  *
- * Lists day-level expenses (fuel, maintenance, office supplies, ...).
- * Backed by the future GetRepExpenses endpoint.
- *
- * Wave 6-Α — UI skeleton (mock rows from MOCK_EXPENSES).
- *
- * TODO Wave 6-Β:
- *   • Replace MOCK_EXPENSES with WatermelonDB query.
- *   • Optional FAB → add expense form (new endpoint TBD with backend team).
- *   • Per-category subtotals.
- *   • Wire export-PDF + print actions.
+ * Backed by the live GetRepExpenses endpoint (RepBoxMovesDetals rows:
+ * amount/name/nmstnd/notes/typems). `typems` = expense category, `name` =
+ * party/name, `notes` = description, `amount` = value. Scoped by sdate.
  */
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ReportScreenLayout } from '@/components/reports/ReportScreenLayout';
 import { ReportTable } from '@/components/reports/ReportTable';
-import { Card } from '@/design-system/components';
+import { Card, EmptyState } from '@/design-system/components';
+import type { PeriodValue } from '@/components/pickers';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
-import { MOCK_EXPENSES } from '@/mocks';
+import {
+  useReportData,
+  numField,
+  strField,
+  periodToRange,
+} from '@/hooks/useReportData';
+import { repExpensesParams } from '@/services/sync/pull/requestScope';
+import type { ReportRow } from '@/services/api/schemas/reports';
 
 const CATEGORY_COLOR: Record<string, string> = {
   وقود: '#BF360C',
@@ -35,19 +36,34 @@ export function ExpensesReportScreen(): React.JSX.Element {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
-  const total = MOCK_EXPENSES.reduce((s, r) => s + r.amount, 0);
-  const byCategory = MOCK_EXPENSES.reduce<Record<string, number>>(
-    (acc, r) => {
-      acc[r.category] = (acc[r.category] ?? 0) + r.amount;
-      return acc;
-    },
-    {},
+  const [period, setPeriod] = useState<PeriodValue>({ preset: 'today' });
+
+  const buildParams = useCallback(() => {
+    const range = periodToRange(period);
+    return repExpensesParams(range);
+  }, [period]);
+
+  const { rows, loading, error, refetch } = useReportData(
+    'getRepExpenses',
+    buildParams,
+    [period],
   );
+
+  const total = rows.reduce((s, r) => s + numField(r, 'amount'), 0);
+  const byCategory = rows.reduce<Record<string, number>>((acc, r) => {
+    const cat = strField(r, 'typems') || 'أخرى';
+    acc[cat] = (acc[cat] ?? 0) + numField(r, 'amount');
+    return acc;
+  }, {});
 
   return (
     <ReportScreenLayout
       title={t('reports.entries.ExpensesReport.title')}
       subtitle={t('reports.entries.ExpensesReport.subtitle')}
+      loading={loading}
+      error={error}
+      onRetry={refetch}
+      onPeriodChange={setPeriod}
       summary={
         <View>
           <Card variant="outlined" style={styles.totalCard}>
@@ -85,40 +101,61 @@ export function ExpensesReportScreen(): React.JSX.Element {
         </View>
       }
     >
-      <ReportTable
-        data={MOCK_EXPENSES}
-        keyExtractor={(r, i) => `${r.date}-${i}`}
-        columns={[
-          { key: 'date', label: t('reports.columns.date'), width: 100, accessor: (r) => r.date },
-          {
-            key: 'cat',
-            label: t('reports.columns.category'),
-            width: 90,
-            render: (r) => (
-              <Text
-                style={{
-                  color: CATEGORY_COLOR[r.category] ?? colors.textPrimary,
-                  fontSize: 12,
-                  fontWeight: '700',
-                }}
-              >
-                {r.category}
-              </Text>
-            ),
-          },
-          { key: 'desc', label: t('reports.columns.description'), width: 180, accessor: (r) => r.description },
-          {
-            key: 'amt',
-            label: t('reports.columns.amount'),
-            width: 110,
-            render: (r) => (
-              <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '700' }}>
-                {r.amount.toLocaleString('en-US')} ر.ي
-              </Text>
-            ),
-          },
-        ]}
-      />
+      {!loading && rows.length === 0 ? (
+        <EmptyState
+          icon="inbox"
+          title={t('reports.empty.title')}
+          subtitle={t('reports.empty.subtitle')}
+        />
+      ) : (
+        <ReportTable<ReportRow>
+          data={rows}
+          keyExtractor={(r, i) => `${strField(r, 'name')}-${i}`}
+          columns={[
+            {
+              key: 'cat',
+              label: t('reports.columns.category'),
+              width: 90,
+              render: (r) => {
+                const cat = strField(r, 'typems');
+                return (
+                  <Text
+                    style={{
+                      color: CATEGORY_COLOR[cat] ?? colors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {cat}
+                  </Text>
+                );
+              },
+            },
+            {
+              key: 'name',
+              label: t('reports.columns.accountName'),
+              width: 140,
+              accessor: (r) => strField(r, 'name'),
+            },
+            {
+              key: 'desc',
+              label: t('reports.columns.description'),
+              width: 160,
+              accessor: (r) => strField(r, 'notes'),
+            },
+            {
+              key: 'amt',
+              label: t('reports.columns.amount'),
+              width: 110,
+              render: (r) => (
+                <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '700' }}>
+                  {numField(r, 'amount').toLocaleString('en-US')} ر.ي
+                </Text>
+              ),
+            },
+          ]}
+        />
+      )}
     </ReportScreenLayout>
   );
 }

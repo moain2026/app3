@@ -1,46 +1,58 @@
 /**
- * BoxMoveDetailsReportScreen — "تفاصيل حركة الصندوق" for a specific date.
+ * BoxMoveDetailsReportScreen — "تفاصيل حركة الصندوق" for a date + account.
  *
- * Lists every individual bond (receipt + payment) that hit the cashbox on
- * the chosen date. Backed by the future GetRepBoxMoveDetails endpoint.
- *
- * Wave 6-Α — UI skeleton (reuses MOCK_BONDS_HEADER as a stand-in dataset).
- *
- * TODO Wave 6-Β:
- *   • Replace dataset with WatermelonDB query filtered by date param.
- *   • Add running cashbox balance column.
- *   • Wire export-PDF + print actions.
+ * Backed by the live GetRepBoxMoveDetails endpoint (RepBoxMovesDetals rows:
+ * amount/name/nmstnd/notes/typems). Receives `date` (+ optional `num`) via
+ * navigation params from the BoxMove report.
  */
 
 import { useRoute, type RouteProp } from '@react-navigation/native';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ReportScreenLayout } from '@/components/reports/ReportScreenLayout';
 import { ReportTable } from '@/components/reports/ReportTable';
-import { Card } from '@/design-system/components';
+import { Card, EmptyState } from '@/design-system/components';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
-import { MOCK_BONDS_HEADER } from '@/mocks';
+import {
+  useReportData,
+  numField,
+  strField,
+} from '@/hooks/useReportData';
+import { repBoxMoveDetailsParams } from '@/services/sync/pull/requestScope';
+import type { ReportRow } from '@/services/api/schemas/reports';
 import type { MainStackParamList } from '@/navigation/types';
 
 export function BoxMoveDetailsReportScreen(): React.JSX.Element {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const route = useRoute<RouteProp<MainStackParamList, 'BoxMoveDetailsReport'>>();
-  const date = route.params?.date ?? '2026-05-22';
+  const date = route.params?.date ?? new Date().toISOString().slice(0, 10);
+  const num = route.params?.num ?? '';
 
-  const total = MOCK_BONDS_HEADER.reduce(
-    (s, b) => (b.type === 'receipt' ? s + b.amount : s - b.amount),
-    0,
+  const buildParams = useCallback(
+    () => repBoxMoveDetailsParams(num, { startDate: date, endDate: date }),
+    [num, date],
   );
+
+  const { rows, loading, error, refetch } = useReportData(
+    'getRepBoxMoveDetails',
+    buildParams,
+    [num, date],
+  );
+
+  const total = rows.reduce((s, r) => s + numField(r, 'amount'), 0);
 
   return (
     <ReportScreenLayout
       title={t('reports.entries.BoxMoveDetailsReport.title')}
       subtitle={t('reports.entries.BoxMoveDetailsReport.subtitle')}
       showPeriod={false}
+      loading={loading}
+      error={error}
+      onRetry={refetch}
       summary={
         <Card variant="outlined" style={styles.kpi}>
           <View style={styles.dateRow}>
@@ -67,49 +79,54 @@ export function BoxMoveDetailsReportScreen(): React.JSX.Element {
         </Card>
       }
     >
-      <ReportTable
-        data={MOCK_BONDS_HEADER}
-        keyExtractor={(r) => String(r.bondNo)}
-        columns={[
-          { key: 'no', label: t('reports.columns.bondNo'), width: 70, accessor: (r) => `#${r.bondNo}` },
-          { key: 'account', label: t('reports.columns.accountName'), width: 180, accessor: (r) => r.accountName },
-          {
-            key: 'type',
-            label: t('reports.columns.type'),
-            width: 70,
-            render: (r) => (
-              <Text
-                style={{
-                  color: r.type === 'receipt' ? colors.success : colors.danger,
-                  fontSize: 11,
-                  fontWeight: '700',
-                }}
-              >
-                {r.type === 'receipt'
-                  ? t('bonds.types.receipt')
-                  : t('bonds.types.payment')}
-              </Text>
-            ),
-          },
-          {
-            key: 'amt',
-            label: t('reports.columns.amount'),
-            width: 120,
-            render: (r) => (
-              <Text
-                style={{
-                  color: r.type === 'receipt' ? colors.success : colors.danger,
-                  fontSize: 12,
-                  fontWeight: '700',
-                }}
-              >
-                {r.type === 'receipt' ? '+' : '−'}
-                {r.amount.toLocaleString('en-US')} ر.ي
-              </Text>
-            ),
-          },
-        ]}
-      />
+      {!loading && rows.length === 0 ? (
+        <EmptyState
+          icon="inbox"
+          title={t('reports.empty.title')}
+          subtitle={t('reports.empty.subtitle')}
+        />
+      ) : (
+        <ReportTable<ReportRow>
+          data={rows}
+          keyExtractor={(r, i) => `${strField(r, 'name')}-${i}`}
+          columns={[
+            {
+              key: 'type',
+              label: t('reports.columns.type'),
+              width: 90,
+              accessor: (r) => strField(r, 'typems'),
+            },
+            {
+              key: 'name',
+              label: t('reports.columns.accountName'),
+              width: 160,
+              accessor: (r) => strField(r, 'name'),
+            },
+            {
+              key: 'notes',
+              label: t('reports.columns.description'),
+              width: 150,
+              accessor: (r) => strField(r, 'notes'),
+            },
+            {
+              key: 'amt',
+              label: t('reports.columns.amount'),
+              width: 110,
+              render: (r) => (
+                <Text
+                  style={{
+                    color: colors.textPrimary,
+                    fontSize: 12,
+                    fontWeight: '700',
+                  }}
+                >
+                  {numField(r, 'amount').toLocaleString('en-US')} ر.ي
+                </Text>
+              ),
+            },
+          ]}
+        />
+      )}
     </ReportScreenLayout>
   );
 }

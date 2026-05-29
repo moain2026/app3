@@ -1,37 +1,48 @@
 /**
  * BalanceHeaderReportScreen — "ميزان عام".
  *
- * Lists every account with its current balance at a chosen cut-off date.
- * Backed by the future GetRepBalanceHeader endpoint.
+ * Lists every account with its current balance. Backed by the live
+ * GetRepBalanceHeader endpoint (BalanceState rows: num/name/balance/
+ * dain/mden/type). No period filter — the legacy report shows the
+ * current balance snapshot, scoped only by branch (appid).
  *
- * Wave 6-Α — UI skeleton (mock rows from MOCK_BALANCE_HEADER).
- *
- * TODO Wave 6-Β:
- *   • Replace MOCK_BALANCE_HEADER with WatermelonDB query.
- *   • Wire currency filter via CurrencyPicker.
- *   • Wire account-filter via AccountPicker (optional subset).
- *   • Implement export-PDF + print actions.
+ * Sign convention (confirmed from owner screenshots + balances PDF):
+ *   balance > 0  → عليه / مدين  (customer owes)  → RED
+ *   balance < 0  → له / دائن    (credit)         → BLUE
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ReportScreenLayout } from '@/components/reports/ReportScreenLayout';
 import { ReportTable } from '@/components/reports/ReportTable';
-import { Card } from '@/design-system/components';
+import { Card, EmptyState } from '@/design-system/components';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
-import { MOCK_BALANCE_HEADER } from '@/mocks';
+import {
+  useReportData,
+  numField,
+  strField,
+} from '@/hooks/useReportData';
+import { repBalanceHeaderParams } from '@/services/sync/pull/requestScope';
+import type { ReportRow } from '@/services/api/schemas/reports';
 
 export function BalanceHeaderReportScreen(): React.JSX.Element {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
-  // ─── Derive summary KPIs from mock dataset ───────────────────
-  const totalAccounts = MOCK_BALANCE_HEADER.length;
-  const totalBalance = MOCK_BALANCE_HEADER.reduce(
-    (s, r) => s + r.balance,
+  const buildParams = useCallback(() => repBalanceHeaderParams(), []);
+  const { rows, loading, error, refetch } = useReportData(
+    'getRepBalanceHeader',
+    buildParams,
+    [],
+  );
+
+  // ─── Derive summary KPIs from the live dataset ───────────────
+  const totalAccounts = rows.length;
+  const totalBalance = rows.reduce(
+    (s, r) => s + numField(r, 'balance'),
     0,
   );
 
@@ -39,6 +50,10 @@ export function BalanceHeaderReportScreen(): React.JSX.Element {
     <ReportScreenLayout
       title={t('reports.entries.BalanceHeaderReport.title')}
       subtitle={t('reports.entries.BalanceHeaderReport.subtitle')}
+      showPeriod={false}
+      loading={loading}
+      error={error}
+      onRetry={refetch}
       summary={
         <View style={styles.summaryRow}>
           <Card variant="outlined" style={styles.kpi}>
@@ -53,38 +68,65 @@ export function BalanceHeaderReportScreen(): React.JSX.Element {
             <Text style={[styles.kpiLabel, { color: colors.textTertiary }]}>
               {t('reports.kpi.totalBalance')}
             </Text>
-            <Text style={[styles.kpiValue, { color: colors.accent }]}>
+            <Text
+              style={[
+                styles.kpiValue,
+                {
+                  color: totalBalance >= 0 ? colors.danger : colors.accent,
+                },
+              ]}
+            >
               {totalBalance.toLocaleString('en-US')} ر.ي
             </Text>
           </Card>
         </View>
       }
     >
-      <ReportTable
-        data={MOCK_BALANCE_HEADER}
-        keyExtractor={(r) => String(r.accountId)}
-        columns={[
-          { key: 'num', label: t('reports.columns.accountNum'), width: 70, accessor: (r) => r.accountNum },
-          { key: 'name', label: t('reports.columns.accountName'), width: 180, accessor: (r) => r.accountName },
-          { key: 'place', label: t('reports.columns.place'), width: 130, accessor: (r) => r.placeName },
-          {
-            key: 'balance',
-            label: t('reports.columns.balance'),
-            width: 120,
-            render: (r) => (
-              <Text
-                style={{
-                  color: r.balance >= 0 ? colors.danger : colors.success,
-                  fontSize: 12,
-                  fontWeight: '700',
-                }}
-              >
-                {r.balance.toLocaleString('en-US')} {r.currencySymbol}
-              </Text>
-            ),
-          },
-        ]}
-      />
+      {!loading && rows.length === 0 ? (
+        <EmptyState
+          icon="inbox"
+          title={t('reports.empty.title')}
+          subtitle={t('reports.empty.subtitle')}
+        />
+      ) : (
+        <ReportTable<ReportRow>
+          data={rows}
+          keyExtractor={(r, i) => `${strField(r, 'num')}-${i}`}
+          columns={[
+            {
+              key: 'num',
+              label: t('reports.columns.accountNum'),
+              width: 70,
+              accessor: (r) => strField(r, 'num'),
+            },
+            {
+              key: 'name',
+              label: t('reports.columns.accountName'),
+              width: 200,
+              accessor: (r) => strField(r, 'name'),
+            },
+            {
+              key: 'balance',
+              label: t('reports.columns.balance'),
+              width: 130,
+              render: (r) => {
+                const bal = numField(r, 'balance');
+                return (
+                  <Text
+                    style={{
+                      color: bal >= 0 ? colors.danger : colors.accent,
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {bal.toLocaleString('en-US')} ر.ي
+                  </Text>
+                );
+              },
+            },
+          ]}
+        />
+      )}
     </ReportScreenLayout>
   );
 }

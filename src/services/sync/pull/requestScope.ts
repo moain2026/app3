@@ -87,3 +87,105 @@ export function bondListParams(): Record<string, string | number> {
 
   return params;
 }
+
+// ─── Report params ──────────────────────────────────────────────────────────
+// IMPORTANT: the report endpoints take the branch as `appid` (lowercase),
+// NOT `appId` — confirmed in *ReportActivity.java (hashMap.put("appid", ...)).
+
+type ReportPeriod = { startDate?: string; endDate?: string };
+
+/** Convert an ISO date string (or undefined) to dd/MM/yyyy, or '' if blank. */
+function isoToApiDate(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return toApiDate(d);
+}
+
+/**
+ * GetRepBalanceHeader (BalanceStateReportActivity):
+ *   currency = places.num (filter, optional) — blank = all
+ *   num      = tgroup.num (filter, optional)  — blank = all
+ *   type     = group filter text (optional)   — blank = all
+ *   appid    = AppConfig.getAppId()
+ */
+export function repBalanceHeaderParams(): Record<string, string | number> {
+  return { currency: '', num: '', type: '', appid: appIdParam() };
+}
+
+/**
+ * GetRepBondsHeader (BondsHeaderReportActivity):
+ *   sdate, edate (dd/MM/yyyy), num (optional), currency (optional), appid.
+ */
+export function repBondsHeaderParams(
+  period: ReportPeriod,
+): Record<string, string | number> {
+  return {
+    sdate: isoToApiDate(period.startDate),
+    edate: isoToApiDate(period.endDate),
+    num: '',
+    currency: '',
+    appid: appIdParam(),
+  };
+}
+
+/**
+ * GetRepBoxMove (BoxMovesReportActivity): sdate + appid.
+ */
+export function repBoxMoveParams(
+  period: ReportPeriod,
+): Record<string, string | number> {
+  return { sdate: isoToApiDate(period.startDate), appid: appIdParam() };
+}
+
+/**
+ * GetRepExpenses (ExpensesReportActivity): sdate + appid.
+ */
+export function repExpensesParams(
+  period: ReportPeriod,
+): Record<string, string | number> {
+  return { sdate: isoToApiDate(period.startDate), appid: appIdParam() };
+}
+
+/**
+ * GetRepReadingHeader (ListReadingReportActivity): type (tab index) + appid.
+ */
+export function repReadingHeaderParams(
+  type = 0,
+): Record<string, string | number> {
+  return { type, appid: appIdParam() };
+}
+
+/**
+ * GetRepBalanceDetailsByDate (BalanceStateDetailsReportActivity):
+ *   num (account), currency, sdate, edate, appid, id (=NOU).
+ */
+export function repBalanceDetailsParams(
+  accountNum: string,
+  period: ReportPeriod,
+): Record<string, string | number> {
+  const params: Record<string, string | number> = {
+    num: accountNum,
+    currency: '',
+    sdate: isoToApiDate(period.startDate),
+    edate: isoToApiDate(period.endDate),
+    appid: appIdParam(),
+  };
+  const nou = getCollectorNou();
+  if (nou != null) params.id = nou;
+  return params;
+}
+
+/**
+ * GetRepBoxMoveDetails (BoxMovesDetailsReportActivity): sdate, num, appid.
+ */
+export function repBoxMoveDetailsParams(
+  accountNum: string,
+  period: ReportPeriod,
+): Record<string, string | number> {
+  return {
+    sdate: isoToApiDate(period.startDate),
+    num: accountNum,
+    appid: appIdParam(),
+  };
+}

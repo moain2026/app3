@@ -16,22 +16,28 @@
 
 import { z } from 'zod';
 
-import { zEnvelope } from './common';
+import { zEnvelope, zResultEnvelope } from './common';
 
 // A "row" is a flat object: { col1: scalar, col2: scalar, ... }
 const ScalarSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 export const ReportRowSchema = z.record(z.string(), ScalarSchema);
 export type ReportRow = z.infer<typeof ReportRowSchema>;
 
+// The live WCF backend wraps every report array in a `<Method>Result` key
+// (e.g. { "GetRepBalanceHeaderResult": [...] }). zResultEnvelope unwraps it
+// BEFORE validation; we also tolerate the legacy { data: [...] } envelope
+// and a bare array.
 export const ReportListResponseSchema = z.union([
-  z.array(ReportRowSchema),
+  zResultEnvelope(z.array(ReportRowSchema)),
   zEnvelope(z.array(ReportRowSchema)),
+  z.array(ReportRowSchema),
 ]);
 export type ReportListResponse = z.infer<typeof ReportListResponseSchema>;
 
 // Single balance payload (numeric/string fields tolerated)
 export const AccountBalanceResponseSchema = z.union([
-  ReportRowSchema,
+  zResultEnvelope(ReportRowSchema),
   zEnvelope(ReportRowSchema),
+  ReportRowSchema,
 ]);
 export type AccountBalanceResponse = z.infer<typeof AccountBalanceResponseSchema>;

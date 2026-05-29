@@ -88,7 +88,7 @@ export type MainStackParamList = {
   /** Daily cashbox movements — GetRepBoxMove. */
   BoxMoveReport: undefined;
   /** Detailed cashbox movements for one date — GetRepBoxMoveDetails. */
-  BoxMoveDetailsReport: { date?: string } | undefined;
+  BoxMoveDetailsReport: { date?: string; num?: string } | undefined;
   /** Daily expenses — GetRepExpenses. */
   ExpensesReport: undefined;
   /** Reading aggregates per place/group — GetRepReadingHeader. */

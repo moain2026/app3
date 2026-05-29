@@ -102,3 +102,48 @@ export const zEnvelope = <T extends z.ZodTypeAny>(inner: T) =>
     data: inner,
     message: zStringOrEmpty.optional(),
   });
+
+/**
+ * ⭐ WCF "{Operation}Result" envelope — THE REAL legacy wire shape.
+ *
+ * Confirmed from v28 decompiled source (`*Response.java` entities):
+ *   • GetListReadingCounter → { "GetListReadingCounterResult": [...] }
+ *   • GetListBonds          → { "GetListBondsResult": [...] }
+ *   • GetListAccounts       → { "GetListAccountsResult": [...] }
+ *   • DeleteReading         → { "DeleteReadingResult": { "Result": "true" } }
+ *
+ * The .NET WCF runtime auto-wraps every operation's payload under a key named
+ * exactly "<OperationName>Result". This helper unwraps that key into `inner`.
+ *
+ * Use `zResultEnvelope(inner)` to accept ANY single `*Result` key, OR
+ * `zResultEnvelopeNamed('GetListBondsResult', inner)` to pin the exact key.
+ *
+ * Reference: SCREEN_ANALYSIS_OPERATIONS.md §1.3/§2.3, ISS-11.
+ */
+export const zResultEnvelopeNamed = <T extends z.ZodTypeAny>(
+  resultKey: string,
+  inner: T,
+) =>
+  z.preprocess((v: unknown) => {
+    if (v != null && typeof v === 'object' && !Array.isArray(v)) {
+      const obj = v as Record<string, unknown>;
+      if (resultKey in obj) return obj[resultKey];
+    }
+    return v;
+  }, inner);
+
+/**
+ * Unwraps ANY single key ending in "Result" (case-sensitive) into `inner`.
+ * Safest default when the exact operation name isn't pinned — picks the first
+ * key matching /Result$/. Falls through untouched if no such key exists
+ * (so bare arrays / already-unwrapped payloads still validate).
+ */
+export const zResultEnvelope = <T extends z.ZodTypeAny>(inner: T) =>
+  z.preprocess((v: unknown) => {
+    if (v != null && typeof v === 'object' && !Array.isArray(v)) {
+      const obj = v as Record<string, unknown>;
+      const resultKey = Object.keys(obj).find(k => /Result$/.test(k));
+      if (resultKey) return obj[resultKey];
+    }
+    return v;
+  }, inner);

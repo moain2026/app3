@@ -162,6 +162,38 @@
 
 ---
 
+## ISS-12 — تضارب معماري: نموذج بيانات app1 الوهمي vs السيرفر الأصلي
+- **المشكلة:** أثناء إصلاح ISS-11 اكتُشف أن طبقات app1 العليا (DB schema +
+  Models + ViewModels + UI + Mocks) للسندات والحسابات مبنية على نموذج بيانات
+  **مثالي مُتخيَّل** لا يطابق السيرفر:
+  - `bonds`: app1 يستخدم `bond_no(number)`, `bond_type('receipt'|'payment')`,
+    `amount`, `amount_paid`, `account_id`.
+    الأصلي (ItemBonds): `nmstnd(string)`, `type(int)`, `dain`, `mden`, `equal`,
+    `balance`, `num_s`, `name_s`, `currencyid`...
+  - `accounts`: app1 يستخدم `code, name_en, currency_id, phone, address`.
+    الأصلي (Accounts): `num, noadad, namet, namep, dain, mden, tel, type,
+    nomstlm, notblh, nog`.
+- **مُطمئن:** جدول `readings` في الـ DB schema مبني **صح** بأسماء الأصلي حرفياً
+  (`num,name,namet,ind,nomstlm,notblh,noadad,nog,ks,kh,cas,asts`). فالتضارب
+  محصور في **السندات + الحسابات** فقط.
+- **السبب الجذري:** app1 صُمّم على «domain نظيف» بدل مطابقة العقد الفعلي للسيرفر
+  (الذي لا يُوصل إلا عبر Tailscale، فلم يُتحقّق منه وقت بناء app1).
+- **نطاق التأثير (blast radius):** `mappers/lists.mapper.ts` →
+  `sync/pull/referencePullHandlers.ts` → `database/schema.ts` (جدول bonds/accounts)
+  → `database/models/{Bond,Account,BondPayment}.ts` → `repository/viewModels/*` →
+  `components/bonds/*` + `screens/bonds/*` + `mocks/*`.
+- **القرار المطلوب (معلّق — بانتظار المستخدم):** خياران:
+  - **(أ) محاذاة كاملة مع السيرفر (موصى به):** إعادة تشكيل جدول bonds/accounts +
+    Models + ViewModels + UI لتطابق `ItemBonds`/`Accounts` حرفياً. أكبر لكنه
+    «مثل التطبيق الأصلي» تماماً ويصلح جذر «ما تظهر بيانات».
+  - **(ب) طبقة ترجمة (adapter):** إبقاء النموذج الوهمي وإضافة تحويل في الـ mapper
+    من حقول الأصلي إلى الوهمية. أسرع لكنه يُبقي ديوناً ويخاطر بفقدان حقول
+    (nmstnd كنص، dain/mden، num_s...).
+- **مرجع:** ISS-11، `SCREEN_ANALYSIS_OPERATIONS.md`، `database/schema.ts`،
+  `database/models/Bond.ts`.
+
+---
+
 ## (قالب لإدخال جديد — انسخه)
 <!--
 ## ISS-N — العنوان

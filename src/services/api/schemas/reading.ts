@@ -14,7 +14,13 @@
 
 import { z } from 'zod';
 
-import { zEnvelope, zIntLoose, zNumberLoose, zStringOrEmpty } from './common';
+import {
+  zEnvelope,
+  zResultEnvelope,
+  zIntLoose,
+  zNumberLoose,
+  zStringOrEmpty,
+} from './common';
 
 // ─── Wire format: a single ItemReading row ────────────────────────────────
 export const ItemReadingDtoSchema = z.object({
@@ -49,15 +55,22 @@ export type ItemReadingDto = z.infer<typeof ItemReadingDtoSchema>;
 // ─── Responses ────────────────────────────────────────────────────────────
 
 /**
- * GetListReadingCounter — legacy may return either:
- *   • a bare array of ItemReading
- *   • or { success, data: [...] } envelope
+ * GetListReadingCounter — the REAL WCF wire shape is:
+ *   { "GetListReadingCounterResult": [ ...ItemReading ] }
+ * (confirmed from ReadingResponse.java — see ISS-11).
  *
- * We accept both via a union; the mapper layer normalizes.
+ * We accept (in priority order):
+ *   1. { GetListReadingCounterResult: [...] }   ← actual server shape
+ *   2. any other single `*Result` envelope       ← defensive
+ *   3. { success, data: [...] }                   ← legacy/back-compat
+ *   4. a bare array                               ← already-unwrapped
+ *
+ * `zResultEnvelope` unwraps (1)/(2) before the union sees the array.
  */
 export const ReadingListResponseSchema = z.union([
-  z.array(ItemReadingDtoSchema),
+  zResultEnvelope(z.array(ItemReadingDtoSchema)),
   zEnvelope(z.array(ItemReadingDtoSchema)),
+  z.array(ItemReadingDtoSchema),
 ]);
 
 export type ReadingListResponse = z.infer<typeof ReadingListResponseSchema>;

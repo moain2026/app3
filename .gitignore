@@ -53,3 +53,4 @@ coverage/
 # Husky
 .husky/_/
 prepared-assets/
+*.apk

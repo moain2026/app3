@@ -139,6 +139,29 @@
 
 ---
 
+## ISS-11 — "تسجيل الدخول ينجح لكن لا تظهر بيانات" (تشخيص جذري)
+- **المشكلة:** المستخدم ثبّت التطبيق، سجّل الدخول بنجاح، لكن كل الشاشات فارغة.
+- **السبب الجذري (٥ أعطال متراكبة في app1):**
+  1. **مفتاح الـ envelope غلط:** الأصلي يرجّع `{ "GetListReadingCounterResult": [...] }`
+     / `{ "GetListBondsResult": [...] }`، بينما `zEnvelope` في app1 يتوقّع
+     `{ success?, data, message? }` أو array مباشر → فشل تحليل → قائمة فاضية.
+  2. **أسماء حقول الـ DTO مختلفة جذرياً:** `AccountDtoSchema` يتوقّع
+     `id/code/currency_id/phone/address`، والأصلي `num/noadad/dain/mden/tel/type/namep`.
+     `z.array(itemSchema).parse` يفشل على كل صف → فاضي. نفس الاحتمال في `BondDtoSchema`.
+  3. **معاملات الطلب:** القراءة تحتاج `id=NOU`، السندات تحتاج
+     `nou+sdate+edate+(num_s إذا SYS!=1)+appId` — وليس `pageNumber/pageSize/name`.
+  4. **توقيت التحميل:** الأصلي ما يحمّل عند فتح الشاشة؛ ينتظر زر "عرض".
+  5. **منطق SYS:** السندات تفلتر `num_s=NOA` فقط إذا `SYS != 1`.
+- **الحل (مخطط، لم يُنفَّذ بعد):** تصحيح الـ envelope ليفك `{Operation}Result`،
+  مطابقة أسماء حقول الـ DTO حرفياً مع `entities/*.java`، بناء معاملات كل شاشة،
+  ضمان حفظ/قراءة `NOU`+الصلاحيات قبل الطلب، اعتماد زر "عرض".
+- **الوقاية:** أي mapper/schema يجب أن يُشتق حرفياً من `entities/*.java` +
+  `*Response.java` (مفتاح الـ wrapper)، لا من تخمين.
+- **مرجع:** `analysis/01_legacy_apk_analysis/SCREEN_ANALYSIS_OPERATIONS.md`،
+  G-2/G-8 في GAP_MATRIX، `ReadingResponse.java`/`BondsResponse.java`/`AccountsResponse.java`.
+
+---
+
 ## (قالب لإدخال جديد — انسخه)
 <!--
 ## ISS-N — العنوان

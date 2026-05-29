@@ -10,27 +10,16 @@
  *   • Chart placeholder (Wave 6-Β: real Victory-Native line chart).
  *   • Table of past N months: month/ks/kh/cas/avg.
  *
- * Wave 6-Α — UI skeleton (data from getReadingsByAccount()).
- *
- * Wave 6-Β — partial wire to WatermelonDB:
- *   • Subscriber lookup (`account`) now subscribes to
- *     `observeAccountByCode(num)` so any sync/seed update reflects live.
- *   • The historical readings table (`history`) remains on the static
- *     MOCK fixture because Wave 6-Β does NOT introduce a monthly-rollup
- *     aggregation table — the live `readings` collection holds one row
- *     per (account, month) but lacks the cas/asts columns needed for
- *     this view. Wave 6-Γ will replace it with a real query joined on
- *     the rollup table once the WCF aggregation endpoint is finalized.
- *
- * TODO Wave 6-Γ:
- *   • Replace `getReadingsByAccount` with a WatermelonDB rollup query.
- *   • Render a real consumption line chart.
- *   • Wire print action to PrinterService.printConsumptionHistory().
- *   • Add date-range filter.
+ * Fully wired to WatermelonDB:
+ *   • Subscriber lookup (`account`) subscribes to `observeAccountByCode(num)`.
+ *   • The readings table subscribes to `observeReadingsByAccount(account.num)`
+ *     and renders the actual reading rows the device holds for this
+ *     subscriber (no fabricated multi-month history — the local store keeps
+ *     one row per current period; a server-side rollup is out of scope).
  */
 
 import { useRoute, type RouteProp } from '@react-navigation/native';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,19 +28,15 @@ import Feather from 'react-native-vector-icons/Feather';
 
 import { AppHeader } from '@/components/layout/AppHeader';
 import { ReportTable } from '@/components/reports/ReportTable';
-import {
-  Card,
-  EmptyState,
-  MockBanner,
-  SectionHeader,
-} from '@/design-system/components';
+import { Card, EmptyState, SectionHeader } from '@/design-system/components';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
 import type { Account } from '@/database/models/Account';
-import { getReadingsByAccount } from '@/mocks';
+import type { Reading } from '@/database/models/Reading';
 import type { MockAccount } from '@/mocks/accounts';
 import type { MainStackParamList } from '@/navigation/types';
 import { observeAccountByCode } from '@/services/repository';
+import { observeReadingsByAccount } from '@/services/repository/readingsRepository';
 import { toMockAccount } from '@/services/repository/viewModels';
 
 export function ReadingsHistoryScreen(): React.JSX.Element {
@@ -64,23 +49,42 @@ export function ReadingsHistoryScreen(): React.JSX.Element {
   const [account, setAccount] = useState<MockAccount | null | undefined>(
     undefined,
   );
+  // Account record id (legacy num) used to query the readings table.
+  const [accountNum, setAccountNum] = useState<number | null>(null);
+  const [history, setHistory] = useState<Reading[]>([]);
 
   useEffect(() => {
     let sub: Subscription | null = null;
     sub = observeAccountByCode(num).subscribe({
       next: (row: Account | null) => {
         setAccount(row != null ? toMockAccount(row) : null);
+        setAccountNum(row != null ? row.num : null);
       },
-      error: () => setAccount(null),
+      error: () => {
+        setAccount(null);
+        setAccountNum(null);
+      },
     });
     return () => {
       if (sub != null) sub.unsubscribe();
     };
   }, [num]);
 
-  // Reading history stays on the MOCK fixture for Wave 6-Β — see file
-  // header for rationale + Wave 6-Γ TODO.
-  const history = useMemo(() => getReadingsByAccount(num), [num]);
+  // Live readings for this subscriber.
+  useEffect(() => {
+    if (accountNum == null) {
+      setHistory([]);
+      return;
+    }
+    let sub: Subscription | null = null;
+    sub = observeReadingsByAccount(accountNum).subscribe({
+      next: (rows) => setHistory(rows),
+      error: () => setHistory([]),
+    });
+    return () => {
+      if (sub != null) sub.unsubscribe();
+    };
+  }, [accountNum]);
 
   // ─── Loading (waiting on first DB emission) ──────────────────
   if (account === undefined) {
@@ -90,7 +94,6 @@ export function ReadingsHistoryScreen(): React.JSX.Element {
         edges={['top']}
       >
         <AppHeader title={t('readings.history.title')} showBack />
-        <MockBanner />
       </SafeAreaView>
     );
   }
@@ -103,7 +106,6 @@ export function ReadingsHistoryScreen(): React.JSX.Element {
         edges={['top']}
       >
         <AppHeader title={t('readings.history.title')} showBack />
-        <MockBanner />
         <EmptyState
           icon="user-x"
           title={t('readings.history.notFoundTitle')}
@@ -114,7 +116,7 @@ export function ReadingsHistoryScreen(): React.JSX.Element {
   }
 
   // ─── Derive simple consumption stats ─────────────────────────
-  const consumptions = history.map((h) => h.cas);
+  const consumptions = history.map((h) => h.actualConsumption ?? 0);
   const avg =
     consumptions.length > 0
       ? Math.round(consumptions.reduce((s, c) => s + c, 0) / consumptions.length)
@@ -128,7 +130,6 @@ export function ReadingsHistoryScreen(): React.JSX.Element {
       edges={['top']}
     >
       <AppHeader title={t('readings.history.title')} showBack />
-      <MockBanner />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* ─── Subscriber header ──────────────────────────────── */}
@@ -214,33 +215,43 @@ export function ReadingsHistoryScreen(): React.JSX.Element {
         {/* ─── History table ──────────────────────────────────── */}
         <SectionHeader title={t('readings.history.tableTitle')} />
 
-        <ReportTable
-          data={history}
-          keyExtractor={(r) => r.updatedAt}
-          columns={[
-            { key: 'date', label: t('readings.history.col.date'), width: 110, accessor: (r) => r.updatedAt.slice(0, 10) },
-            { key: 'ks', label: t('readings.history.col.previous'), width: 90, accessor: (r) => r.ks },
-            { key: 'kh', label: t('readings.history.col.current'), width: 90, accessor: (r) => r.kh ?? '—' },
-            {
-              key: 'cas',
-              label: t('readings.history.col.consumption'),
-              width: 100,
-              render: (r) => (
-                <Text
-                  style={{
-                    color:
-                      r.cas > r.asts ? colors.warning : colors.textPrimary,
-                    fontSize: 12,
-                    fontWeight: '700',
-                  }}
-                >
-                  {r.cas}
-                </Text>
-              ),
-            },
-            { key: 'asts', label: t('readings.history.col.avg'), width: 80, accessor: (r) => r.asts },
-          ]}
-        />
+        {history.length === 0 ? (
+          <EmptyState
+            icon="inbox"
+            title={t('readings.history.emptyTitle')}
+            subtitle={t('readings.history.emptySubtitle')}
+          />
+        ) : (
+          <ReportTable
+            data={history}
+            keyExtractor={(r) => r.localUuid}
+            columns={[
+              { key: 'date', label: t('readings.history.col.date'), width: 110, accessor: (r) => (r.readingDate ?? r.updatedAt).toISOString().slice(0, 10) },
+              { key: 'ks', label: t('readings.history.col.previous'), width: 90, accessor: (r) => r.ks },
+              { key: 'kh', label: t('readings.history.col.current'), width: 90, accessor: (r) => r.kh ?? '—' },
+              {
+                key: 'cas',
+                label: t('readings.history.col.consumption'),
+                width: 100,
+                render: (r) => {
+                  const cons = r.actualConsumption ?? 0;
+                  return (
+                    <Text
+                      style={{
+                        color: cons > r.asts ? colors.warning : colors.textPrimary,
+                        fontSize: 12,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {cons}
+                    </Text>
+                  );
+                },
+              },
+              { key: 'asts', label: t('readings.history.col.avg'), width: 80, accessor: (r) => r.asts },
+            ]}
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   );

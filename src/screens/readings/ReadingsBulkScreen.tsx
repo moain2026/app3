@@ -2,24 +2,19 @@
  * ReadingsBulkScreen — fast-entry grid for posting many readings at once.
  *
  * Workflow:
- *   1. User filters by place + book + group (top filter card).
- *   2. Pending subscribers appear in a scrollable list with an inline
- *      numeric input per row.
- *   3. Bottom bar shows totals + a single "post all" CTA.
+ *   1. User filters by place (top filter card).
+ *   2. Pending subscribers (cas == 0) appear in a scrollable list with an
+ *      inline numeric input per row.
+ *   3. Bottom bar shows totals + a single "post all" CTA that writes every
+ *      draft via `updateLocalReading` (local write + enqueue SaveReading).
  *
- * Wave 6-Α — UI skeleton (data from getPendingReadings()).
- *
- * TODO Wave 6-Β:
- *   • Wire each row's onChangeText to the WatermelonDB Reading model.
- *   • Re-use the over-consumption validator from ReadingDetailScreen.
- *   • Implement batched optimistic save via SyncService.queueBatch().
- *   • Add keyboard-aware scrolling so the focused row stays visible.
+ * Wired to live WatermelonDB: `observeReadings({ status: 'pending' })`.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Pressable,
+  Alert,
   StyleSheet,
   Text,
   TextInput,
@@ -27,23 +22,34 @@ import {
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Subscription } from 'rxjs';
 import Feather from 'react-native-vector-icons/Feather';
 
 import { AppHeader } from '@/components/layout/AppHeader';
 import { PlacePicker } from '@/components/pickers';
-import {
-  Card,
-  EmptyState,
-  FormField,
-  MockBanner,
-  SectionHeader,
-} from '@/design-system/components';
+import { Card, EmptyState, FormField, SectionHeader } from '@/design-system/components';
 import { PrimaryButton } from '@/components/forms/PrimaryButton';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
-import { getPendingReadings, type MockReading, type MockPlace } from '@/mocks';
+import type { Reading } from '@/database/models/Reading';
+import type { MockPlace } from '@/mocks';
+import {
+  observeReadings,
+  updateLocalReading,
+  type ReadingsQueryFilters,
+} from '@/services/repository/readingsRepository';
 
 const ROW_HEIGHT = 78;
+
+const BASE_FILTERS: ReadingsQueryFilters = {
+  searchQuery: '',
+  area: null,
+  book: null,
+  group: null,
+  status: 'pending',
+  sortBy: 'num',
+  sortOrder: 'asc',
+};
 
 export function ReadingsBulkScreen(): React.JSX.Element {
   const { t } = useTranslation();
@@ -52,26 +58,69 @@ export function ReadingsBulkScreen(): React.JSX.Element {
   const [place, setPlace] = useState<MockPlace | null>(null);
   const [placeOpen, setPlaceOpen] = useState(false);
   const [entries, setEntries] = useState<Record<string, string>>({});
+  const [readings, setReadings] = useState<Reading[]>([]);
+  const [saving, setSaving] = useState(false);
 
-  const pending = useMemo(getPendingReadings, []);
-  const filtered = useMemo(
-    () =>
-      place
-        ? pending.filter((r) => r.nomstlm === place.id)
-        : pending,
-    [pending, place],
+  // Live pending readings, re-filtered by selected place (nomstlm).
+  useEffect(() => {
+    const filters: ReadingsQueryFilters = {
+      ...BASE_FILTERS,
+      area: place && place.id !== 0 ? place.id : null,
+    };
+    let sub: Subscription | null = null;
+    sub = observeReadings(filters).subscribe({
+      next: (rows) => setReadings(rows),
+      error: () => setReadings([]),
+    });
+    return () => {
+      sub?.unsubscribe();
+    };
+  }, [place]);
+
+  const draftCount = useMemo(
+    () => Object.values(entries).filter((v) => v.trim() !== '').length,
+    [entries],
   );
 
-  const draftCount = Object.values(entries).filter((v) => v.trim() !== '').length;
-
-  const handleChange = (num: string, value: string): void => {
-    // Allow only numeric input (Wave 6-Β: enforce min > previous reading).
+  const handleChange = (key: string, value: string): void => {
     const cleaned = value.replace(/[^0-9]/g, '');
-    setEntries((prev) => ({ ...prev, [num]: cleaned }));
+    setEntries((prev) => ({ ...prev, [key]: cleaned }));
   };
 
-  const renderItem = ({ item }: { item: MockReading }): React.JSX.Element => {
-    const draft = entries[item.num] ?? '';
+  const handleSaveAll = async (): Promise<void> => {
+    const drafts = readings
+      .map((r) => ({ reading: r, raw: entries[r.localUuid] ?? '' }))
+      .filter((d) => d.raw.trim() !== '');
+    if (drafts.length === 0) {
+      return;
+    }
+    setSaving(true);
+    let ok = 0;
+    let failed = 0;
+    for (const d of drafts) {
+      const newKh = Number(d.raw);
+      // Skip invalid / non-increasing readings (must be >= previous).
+      if (!Number.isFinite(newKh) || newKh < d.reading.ks) {
+        failed += 1;
+        continue;
+      }
+      try {
+        await updateLocalReading(d.reading, newKh);
+        ok += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    setSaving(false);
+    setEntries({});
+    Alert.alert(
+      t('readings.bulk.savedTitle'),
+      t('readings.bulk.savedMsg', { ok, failed }),
+    );
+  };
+
+  const renderItem = ({ item }: { item: Reading }): React.JSX.Element => {
+    const draft = entries[item.localUuid] ?? '';
     return (
       <View style={[styles.row, { borderBottomColor: colors.border }]}>
         <View style={styles.rowInfo}>
@@ -81,9 +130,7 @@ export function ReadingsBulkScreen(): React.JSX.Element {
           >
             {item.name}
           </Text>
-          <Text
-            style={[styles.rowMeta, { color: colors.textTertiary }]}
-          >
+          <Text style={[styles.rowMeta, { color: colors.textTertiary }]}>
             #{item.num} · {t('readings.bulk.previous')}: {item.ks}
           </Text>
         </View>
@@ -92,8 +139,7 @@ export function ReadingsBulkScreen(): React.JSX.Element {
             styles.input,
             {
               backgroundColor: colors.inputBg,
-              borderColor:
-                draft !== '' ? colors.accent : colors.inputBorder,
+              borderColor: draft !== '' ? colors.accent : colors.inputBorder,
               color: colors.textPrimary,
             },
           ]}
@@ -101,7 +147,7 @@ export function ReadingsBulkScreen(): React.JSX.Element {
           placeholderTextColor={colors.inputPlaceholder}
           keyboardType="numeric"
           value={draft}
-          onChangeText={(v) => handleChange(item.num, v)}
+          onChangeText={(v) => handleChange(item.localUuid, v)}
           maxLength={9}
         />
       </View>
@@ -114,28 +160,29 @@ export function ReadingsBulkScreen(): React.JSX.Element {
       edges={['top']}
     >
       <AppHeader title={t('readings.bulk.title')} showBack />
-      <MockBanner />
 
       <View style={styles.filterArea}>
         <Card variant="outlined">
           <FormField
             label={t('readings.bulk.placeFilter')}
-            value={place ? place.name : ''}
+            value={place && place.id !== 0 ? place.name : ''}
             placeholder={t('readings.bulk.allPlaces')}
             readOnly
             onPress={() => setPlaceOpen(true)}
             leadingIcon="map-pin"
-            trailingIcon={place ? 'x' : 'chevron-down'}
-            onTrailingPress={place ? () => setPlace(null) : undefined}
+            trailingIcon={place && place.id !== 0 ? 'x' : 'chevron-down'}
+            onTrailingPress={
+              place && place.id !== 0 ? () => setPlace(null) : undefined
+            }
           />
         </Card>
       </View>
 
       <SectionHeader
-        title={`${t('readings.bulk.section')} (${filtered.length})`}
+        title={`${t('readings.bulk.section')} (${readings.length})`}
       />
 
-      {filtered.length === 0 ? (
+      {readings.length === 0 ? (
         <EmptyState
           icon="check-circle"
           title={t('readings.bulk.emptyTitle')}
@@ -143,10 +190,10 @@ export function ReadingsBulkScreen(): React.JSX.Element {
         />
       ) : (
         <FlashList
-          data={filtered}
+          data={readings}
           renderItem={renderItem}
           estimatedItemSize={ROW_HEIGHT}
-          keyExtractor={(r) => r.num}
+          keyExtractor={(r) => r.localUuid}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: 120 }}
         />
@@ -164,20 +211,17 @@ export function ReadingsBulkScreen(): React.JSX.Element {
       >
         <View style={styles.actionBarInfo}>
           <Feather name="edit-3" size={16} color={colors.accent} />
-          <Text
-            style={[styles.actionBarText, { color: colors.textPrimary }]}
-          >
+          <Text style={[styles.actionBarText, { color: colors.textPrimary }]}>
             {t('readings.bulk.draftCount', { count: draftCount })}
           </Text>
         </View>
         <View style={styles.actionBarButton}>
           <PrimaryButton
             title={t('readings.bulk.saveAll')}
-            disabled={draftCount === 0}
+            disabled={draftCount === 0 || saving}
+            loading={saving}
             onPress={() => {
-              // TODO Wave 6-Β: persist all entries via SyncService.queueBatch()
-              // and clear the local draft map on success.
-              setEntries({});
+              void handleSaveAll();
             }}
           />
         </View>
@@ -191,14 +235,6 @@ export function ReadingsBulkScreen(): React.JSX.Element {
           setPlaceOpen(false);
         }}
       />
-
-      {/* Discreet dev tag. */}
-      {__DEV__ ? (
-        <Pressable style={styles.devTag} onPress={() => setEntries({})}>
-          <Feather name="info" size={10} color="#856404" />
-          <Text style={styles.devTagText}>UI skeleton — Wave 6-Α</Text>
-        </Pressable>
-      ) : null}
     </SafeAreaView>
   );
 }
@@ -222,22 +258,6 @@ const styles = StyleSheet.create({
   },
   actionBarText: {
     fontSize: 12,
-    fontWeight: '700',
-  },
-  devTag: {
-    alignItems: 'center',
-    backgroundColor: '#FFF3CD',
-    bottom: 80,
-    end: spacing[3],
-    flexDirection: 'row',
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    position: 'absolute',
-  },
-  devTagText: {
-    color: '#856404',
-    fontSize: 9,
     fontWeight: '700',
   },
   filterArea: {

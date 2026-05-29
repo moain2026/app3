@@ -169,6 +169,24 @@ export async function fetchReadings(
 }
 
 /**
+ * Reactive list of readings belonging to one account (by legacy `num`,
+ * the account record id). Used by `ReadingsHistoryScreen` to show the
+ * actual reading rows the device holds for a subscriber, newest first.
+ *
+ * NOTE: the device holds one `readings` row per (account, current period);
+ * a true multi-month rollup lives server-side. We surface exactly what is
+ * stored locally — no fabricated history.
+ */
+export function observeReadingsByAccount(
+  accountNum: number,
+): Observable<Reading[]> {
+  return database.collections
+    .get<Reading>('readings')
+    .query(Q.where('num', accountNum), Q.sortBy('num', Q.desc))
+    .observe();
+}
+
+/**
  * Find by local_uuid. Returns null if not found. Used by ReadingDetail.
  */
 export async function findByUuid(localUuid: string): Promise<Reading | null> {

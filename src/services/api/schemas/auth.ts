@@ -88,10 +88,47 @@ export const RegisterRequestSchema = z.object({
  * Axios decodes this into a JavaScript string. An empty string ("") is
  * treated as a failed authentication (server returns an empty quoted
  * string when credentials do not match — typical .NET WCF pattern).
+ *
+ * ⚠️ REAL-WORLD VARIANTS observed in the field — we normalise ALL of them
+ * down to the bare token string so the login flow never rejects a valid
+ * token on a cosmetic wrapper:
+ *
+ *   1. Bare string literal      → `"bUqox…=="`                (axios → string)
+ *   2. Raw text (no quotes)     → `bUqox…==`                  (axios → string,
+ *                                  base64 isn't valid JSON so axios keeps it raw)
+ *   3. WCF *Result envelope     → `{ "AuthenticateResult": "bUqox…==" }`
+ *   4. AccessToken object       → `{ "access_token": "bUqox…==" }`
+ *
+ * `z.preprocess` unwraps (3)/(4)/extracts the inner string, trims stray
+ * whitespace + surrounding quotes, then the inner `z.string().min(1)`
+ * guarantees a non-empty token. An empty/blank token ⇒ failed auth.
  */
-export const AuthenticateResponseSchema = z
-  .string()
-  .min(1, 'auth.authenticate.emptyToken');
+export const AuthenticateResponseSchema = z.preprocess((raw) => {
+  // Unwrap object envelopes first.
+  if (raw != null && typeof raw === 'object' && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>;
+    // (3) any key ending in `Result` (WCF) — e.g. AuthenticateResult.
+    const resultKey = Object.keys(obj).find((k) => /Result$/i.test(k));
+    if (resultKey != null && typeof obj[resultKey] === 'string') {
+      raw = obj[resultKey];
+    } else if (typeof obj.access_token === 'string') {
+      // (4) AccessToken-style payload.
+      raw = obj.access_token;
+    } else if (typeof obj.token === 'string') {
+      raw = obj.token;
+    }
+  }
+  if (typeof raw === 'string') {
+    // Trim whitespace + a single pair of wrapping double-quotes (which can
+    // survive when the server double-encodes the JSON string literal).
+    let s = raw.trim();
+    if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) {
+      s = s.slice(1, -1).trim();
+    }
+    return s;
+  }
+  return raw;
+}, z.string().min(1, 'auth.authenticate.emptyToken'));
 
 /**
  * AccessToken response from /UserAuth, /refresh, /register.

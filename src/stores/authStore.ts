@@ -390,6 +390,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Captured for cross-attempt diagnostics: if STAGE 2 also fails, we
     // prepend STAGE 1's response body so the operator can see both.
     let stage1Diagnostic: string | null = null;
+    // Stashed when STAGE 1 obtained a valid token but no NOU. Lets STAGE 2
+    // failure fall back to a valid /Authenticate session instead of locking
+    // the user out (this server returns `{}` on /Login).
+    let stage1Token: string | null = null;
+    let stage1User: AuthUser | null = null;
 
     try {
       const raw = await api.call<unknown>('authenticate', {
@@ -434,16 +439,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         // If /Authenticate gave a token but we could NOT resolve the
         // collector's NOU (roster fetch failed, or this user is not in the
-        // roster), do NOT settle on a scope-less session — that's exactly
-        // the "connected but no data" trap. Fall through to STAGE 2 (/Login)
-        // whose Users payload carries NOU/NOA/SYS directly (the legacy app
-        // ONLY uses /Login). A SYS user is fine with nou=0 (sees all data).
+        // roster), prefer trying STAGE 2 (/Login) to obtain NOU/NOA/SYS
+        // directly. BUT — if STAGE 2 also fails (this server returns `{}`
+        // on /Login), we must NOT lock the user out: the /Authenticate
+        // token is a PROVEN-valid credential. So we stash it here and, on
+        // STAGE 2 failure, fall back to logging in with this token (scope
+        // resolves later via sync; SYS users see everything anyway).
         const haveScope =
           (resolvedUser.nou != null && resolvedUser.nou > 0) ||
           resolvedUser.sys === 1;
         if (!haveScope) {
-          stage1Diagnostic = `STAGE 1 — /Authenticate succeeded (token obtained) but could NOT resolve NOU from /GetListUsers for "${username}". Falling back to /Login to obtain the Users payload directly.`;
-          log.warn('STAGE 1 token OK but no NOU — falling through to /Login');
+          stage1Token = access;
+          stage1User = resolvedUser;
+          stage1Diagnostic = `STAGE 1 — /Authenticate succeeded (token obtained) but could NOT resolve NOU from /GetListUsers for "${username}". Trying /Login for the Users payload; will fall back to this token if /Login is empty.`;
+          log.warn('STAGE 1 token OK but no NOU — trying /Login, token stashed as fallback');
         } else {
           persistCollectorIdentity(resolvedUser);
 
@@ -502,6 +511,57 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     };
     log.debug('STAGE 2 — /Login attempt', loginRedacted);
 
+    // Last-resort recovery: STAGE 1 gave us a PROVEN-valid /Authenticate token
+    // but no NOU, and STAGE 2 (/Login) just failed (this server returns `{}`).
+    // Logging the user in with the valid token is strictly better than locking
+    // them out — scope (NOU/NOA/SYS) resolves later via background sync, and a
+    // SYS/admin user sees everything regardless. Returns true if it recovered.
+    const settleWithStage1Token = async (): Promise<boolean> => {
+      const token = stage1Token;
+      if (token === null) return false;
+
+      const recoveredUser: AuthUser = stage1User ?? {
+        username,
+        name: username,
+        permissions: {
+          canDelete: false,
+          canEdit: false,
+          canViewReports: false,
+          canViewAllReadings: false,
+          canViewAllSubscribers: false,
+          isAdmin: false,
+        },
+      };
+
+      if (stage1User !== null) {
+        persistCollectorIdentity(stage1User);
+      }
+
+      await Promise.all([
+        setAccessToken(token),
+        setRefreshToken(token),
+        setLastUsername(username),
+      ]);
+      setLastLoginAt(new Date());
+
+      set({
+        user: recoveredUser,
+        accessToken: token,
+        refreshToken: token,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        lastLoginError: null,
+        isDevBypass: false,
+      });
+      log.info(
+        'STAGE 2 failed but recovered with valid STAGE 1 /Authenticate token',
+        { username, nou: stage1User?.nou ?? 0, sys: stage1User?.sys ?? 0 },
+      );
+      fireAfterLoginSync();
+      return true;
+    };
+
     try {
       const raw = await api.call<unknown>('login', {
         body: { username, password, appId, secureId },
@@ -509,6 +569,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const parsed = LoginUserResponseSchema.safeParse(raw);
       if (!parsed.success) {
         log.warn('STAGE 2 — /Login response failed schema validation');
+        // Recover with the valid STAGE 1 token before giving up.
+        if (await settleWithStage1Token()) return true;
         const rawAsString =
           typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
         set({
@@ -538,6 +600,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (access.length === 0) {
         log.warn('STAGE 2 — /Login response had no access_token');
+        // This is the `{}` case from the live server: /Login carried no token.
+        // Recover with the valid STAGE 1 /Authenticate token before failing.
+        if (await settleWithStage1Token()) return true;
         const usersJson = JSON.stringify(u, null, 2);
         set({
           isLoading: false,
@@ -585,6 +650,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       log.warn('STAGE 2 — /Login threw', { message: msg });
+      // /Login errored (HTTP 4xx/5xx or network). If STAGE 1 already proved a
+      // valid token, recover with it rather than locking the user out.
+      if (await settleWithStage1Token()) return true;
       const httpStatus = extractHttpStatus(err);
       const errorCode = extractErrorCode(err);
       const responseBody = extractResponseBody(err, msg);

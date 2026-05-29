@@ -1,0 +1,48 @@
+# ── Node / RN ──────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnp.*
+
+# ── Build outputs ──────────────────────────────────────────
+android/app/build/
+android/build/
+android/.gradle/
+ios/build/
+ios/Pods/
+*.apk
+*.aab
+*.ipa
+
+# ── Expo / EAS ─────────────────────────────────────────────
+.expo/
+dist/
+web-build/
+
+# ── Metro / RN caches ──────────────────────────────────────
+.metro-health-check*
+*.tsbuildinfo
+
+# ── Env & secrets ──────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.keystore
+!debug.keystore
+google-services.json
+
+# ── OS / IDE ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ── Logs ───────────────────────────────────────────────────
+*.log
+supervisord.log
+supervisord.pid
+supervisor.sock
+
+# ── Analysis: keep reports, ignore the large original APK ──
+analysis/**/*.apk

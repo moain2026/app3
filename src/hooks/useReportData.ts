@@ -33,20 +33,33 @@ export interface UseReportDataResult {
 
 type ParamMap = Record<string, string | number | boolean | undefined>;
 
+export interface UseReportDataOptions {
+  /** When false, the hook stays idle (no fetch, empty rows, not loading). */
+  enabled?: boolean;
+}
+
 export function useReportData(
   endpoint: EndpointKey,
   buildParams: () => ParamMap,
   deps: ReadonlyArray<unknown> = [],
+  options: UseReportDataOptions = {},
 ): UseReportDataResult {
+  const { enabled = true } = options;
   const { t } = useTranslation();
   const [rows, setRows] = useState<ReportRow[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(enabled);
   const [error, setError] = useState<string | null>(null);
 
   // Guard against setting state after unmount / out-of-order responses.
   const reqIdRef = useRef(0);
 
   const run = useCallback(async () => {
+    if (!enabled) {
+      setLoading(false);
+      setRows([]);
+      setError(null);
+      return;
+    }
     const myReq = ++reqIdRef.current;
     setLoading(true);
     setError(null);
@@ -69,7 +82,7 @@ export function useReportData(
     }
     // buildParams is intentionally re-read on every run; deps drive re-fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endpoint, t]);
+  }, [endpoint, t, enabled]);
 
   useEffect(() => {
     void run();

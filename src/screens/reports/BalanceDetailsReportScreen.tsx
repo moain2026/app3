@@ -51,6 +51,7 @@ export function BalanceDetailsReportScreen(): React.JSX.Element {
     'getRepBalanceDetailsByDate',
     buildParams,
     [accountNum, period, enabled],
+    { enabled },
   );
 
   const showTable = enabled && (loading || rows.length > 0);

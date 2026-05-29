@@ -24,13 +24,28 @@
 
 ## G-1 🔴 — نظام الصلاحيات: تبسيط مُفرِط يكسر منطق HakAccess الأصلي
 
+> ⚠️ **مُحدَّث بعد تحليل الباكِند (B3):** النظام **طبقتان** وليس طبقة واحدة.
+> انظر `01_legacy_apk_analysis/KNOWN_DISCREPANCIES.md` D-12 وقالب B3
+> `for_main_repo/permissions_matrix.md`.
+
 ### ما يفعله الأصلي (مصدر الحقيقة)
-- الكيان `entities/Users.java` يحمل **6 أعلام من نوع `int`** (وليس boolean):
-  `ED, DE, S_K, S_S, REP, SYS`.
-- منطق الفحص في الأصلي: `flag > 0` (وليس `== true`)، و **`SYS > 0` يفتح كل شيء**.
-- هذه الأعلام الستة تتفرّع إلى **8 قوائم صلاحيات** (قراءة/تعديل/حذف لكل وحدة):
-  القراءات، السندات، سندات الدفع، التقارير، الإعدادات، معلومات الشركة... إلخ
-  (راجع `01_legacy_apk_analysis/AUTH_FLOW.md` للجدول الكامل).
+
+**Tier-A — أعلام على مستوى المستخدم (UI-gating):**
+- الخادم (`USER_R`) + DTO `Users` يحملان **7 أعلام `int`**:
+  `NOA, ED, DE, S_K, S_S, REP, SYS` (B3 `04_PERMISSIONS_SYSTEM.md`). الكلاينت
+  الأصلي يخزّنها في `entities/HakAccess.java` عبر `HakAccessHelper`.
+- `NOA` **مزدوج**: رقم صندوق/till (`no_box`) **و** علم قدرة — **افصلهما في app3**
+  (`tillAccountId: number` و `canListAccounts: boolean`).
+- `SYS` (مدير النظام) يتجاوز الباقي.
+- **منطق الفحص (⚠️ يجب التحقق):** B3 يرجّح `Convert.ToInt32(row["FLAG"]) == 1`
+  في C# الخادم. تحليلي السابق (من الكلاينت) رأى `> 0`. **اقرأ
+  `entities/Users.java` + `HakAccessHelper.java` في v28 لحسم المنطق قبل الكتابة.**
+
+**Tier-B — ACL لكل مكان (row-filtering على الخادم):**
+- جدول `USER_MNATK(NOU, no_mstlm, RED, SDAD, NAMEM)`: `RED`=قراءة،
+  `SDAD`=كتابة لكل مكان (`no_mstlm`). الخادم يفرضها عبر SQL subqueries
+  (`nvl(red,0)>0` / `nvl(sdad,0)>0`). **الكلاينت لا يحتاج تطبيقها** — يصله
+  الخادم مصفّى؛ لكن endpoint `GetListUserPlaces` يعيد Tier-B لعرض الأماكن المسموحة.
 
 ### ما يفعله app1 (خطأ)
 `src/stores/authStore.ts` (الأسطر 139–145):
@@ -55,15 +70,18 @@ permissions: {
 - لا يوجد فصل بين "أرى السندات" و"أعدّل السندات" و"أحذف السندات".
 
 ### الإصلاح المطلوب
-إنشاء وحدة `permissions` مركزية تعيد بناء منطق HakAccess:
+إنشاء وحدة `permissions` مركزية تعيد بناء منطق HakAccess (استرشد بقالب B3
+`for_main_repo/permissions_matrix.md` ودالة `can(me, p)`):
 ```ts
-// 1) النجاح = flag > 0 (ليس === true) — محفوظ عبر zBoolLoose ✅
-// 2) isAdmin (SYS) يتجاوز كل شيء
-// 3) دالة can(action, module) تشتقّ 8 قوائم من 6 أعلام
+// 1) Tier-A: 7 أعلام (NOA,ED,DE,S_K,S_S,REP,SYS) — المنطق حسب v28 (>0 أو ==1: تحقّق)
+// 2) isAdmin (SYS) يتجاوز كل شيء (Tier-B لا ينطبق على SYS)
+// 3) افصل NOA: tillAccountId (رقم) عن canListAccounts (bool)
+// 4) دالة can(action, module) تشتقّ القوائم من الأعلام (خريطة endpoint↔flag)
 function can(p: Permissions, module: Module, action: Action): boolean {
-  if (p.isAdmin) return true;                 // SYS > 0 يفتح الكل
-  // خريطة (module, action) → flag وفق AUTH_FLOW.md
+  if (p.isAdmin) return true;                 // SYS يفتح الكل
+  // خريطة (module, action) → flag وفق permissions_matrix.md / AUTH_FLOW.md
 }
+// Tier-B: لا تُطبَّق في الكلاينت (الخادم يصفّي)؛ فقط اعرض الأماكن من GetListUserPlaces.
 ```
 **ملفات الإصلاح:** `src/stores/authStore.ts` + ملف جديد
 `src/services/auth/permissions.ts` + استخدامه في الحرّاس (navigation guards).
@@ -139,6 +157,12 @@ function can(p: Permissions, module: Module, action: Action): boolean {
 ### الإصلاح
 interceptor في `services/api` يحقن `appId` من `authStore.branchId` لكل طلب
 يتطلّبه. **أولوية P3 (مؤجّل)** — لا يكسر التشغيل أحادي الفرع (appId="1").
+
+> ⚠️ **مُحدَّث بعد B3:** `appId` ليس مجرّد «رقم فرع» تجميلي — بل **مفتاح
+> المستأجر (tenant key)** الذي يختار به الخادم **قاعدة Oracle المناسبة**
+> (`Dictionary<int,string> ConnetionStrings`). إن كانت الشركة تُشغّل **عدة فروع**
+> (قواعد بيانات منفصلة)، ترتفع أولوية G-5. **تأكيد عدد الفروع بيد المستخدم.**
+> انظر B3 `07_MULTI_TENANT.md`.
 
 ---
 

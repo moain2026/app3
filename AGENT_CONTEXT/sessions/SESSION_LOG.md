@@ -6,6 +6,49 @@
 
 ---
 
+## الجلسة 003 — 2026-05-29 — تكامل تحليل الباكِند (ريبو B3) ومصالحة التناقضات
+
+**الوكيل:** Lead Architect / Migration Expert.
+
+**الطلب:** المستخدم أعطى ريبو رابعاً `ElectriceAppLastUpdateB3` وطلب:
+«شوف، وكيل حلّله — حلّل واقرا وافهمه».
+
+**ما تمّ:**
+1. استُنسخ B3 إلى `/home/user/_analysis_src/B3/` (خارج git، للقراءة فقط).
+2. قُرئت كل ملفاته الحرجة: `00_OVERVIEW`, `01_WCF_ENDPOINTS`, `02_JWT_AUTHENTICATION`,
+   `03_DATA_MODELS`, `04_PERMISSIONS_SYSTEM`, `05_ORACLE_INTEGRATION`,
+   `07_MULTI_TENANT`, `10_APK_V26_ANALYSIS`, و`for_main_repo/{dtos.ts,endpoints.ts,
+   jwt_interceptor.ts,permissions_matrix.md}`.
+3. **اكتشاف محوري:** B3 حلّل **الخادم نفسه** (.NET WCF + Oracle) من نسخة **v26**،
+   بينما أنا حللت كلاينت **v28**. التعارضات الأربعة ليست أخطاء بل **فرق نسخة**.
+4. **مصالحة التناقضات (بالتحقق من مصدر v28 المُفكَّك):**
+   - **A (baseUrl):** v28 `AppConfig.java:44` = `/electric/`؛ v26 بدونه. فرق نسخة. (ISS-7)
+   - **C (المصادقة):** v28 `RetrofitBuilder.createServiceWithAuth` يحقن
+     `Authorization: Bearer <accessToken>` + `CustomAuthenticator` → **JWT مؤكد قطعاً
+     في v28**. B3 يفصّل الخادم (jose-jwt v5، HS256، بلا exp). (ISS-8)
+   - **D (الصلاحيات):** B3 كشف **طبقتين**: Tier-A (7 أعلام على `USER_R`) + Tier-B
+     (`USER_MNATK` ACL لكل مكان: RED/SDAD). تحليلي رأى Tier-A فقط (6 أعلام). (ISS-9)
+   - **B/المحرّك:** v28 تستخدم **Retrofit/OkHttp/Moshi فعلاً** (طور انتقال من loopj). (ISS-10)
+5. **اكتشافات إثرائية من B3:** قاعدة **Oracle** (12 جدول + ~75 SQL)، `appId`=
+   مفتاح المستأجر/الفرع (جواب سؤال «الفروع»)، نتائج أمنية **P0** (حقن SQL على
+   /Login و/ChangePassword، اعتماد Oracle مضمّن بالنص، HTTP صريح).
+6. **التوثيق:** حُدِّث `AGENTS.md` (F-1/F-3/F-4/F-5/F-10/F-13 + F-14 JWT + F-15 أمن +
+   مرجع B3 في §4)، أُضيف DEC-6 (سلطة المصادر)، ISS-7..ISS-10، وحُدِّثت تقارير
+   `analysis/` (KNOWN_DISCREPANCIES D-6..D-9، GAP_MATRIX، architecture، exec summary).
+
+**الحالة عند نهاية الجلسة:**
+- ✅ B3 مفهوم بالكامل ومدمج في توثيقنا. التناقضات الأربعة محسومة.
+- ✅ سؤال «الفروع» مُجاب: `appId` = الفرع/المستأجر.
+- ⏳ **التالي (لم يبدأ):** نسخ app1 → app3 + CI/CD + بدء M0. ينتظر إشارة المستخدم
+  («كمل») أو تأكيده عدد الفروع الفعلية.
+- 📌 **نقطة الاستئناف للوكيل التالي:** كل التحليل جاهز. ابدأ بنسخ
+  `/home/user/_analysis_src/app1/AbbasiTahseel/` إلى جذر `webapp`، ثم طبّق إصلاحات
+  G-1..G-9 ونمط JWT/Retrofit من v28 + قوالب B3 (`endpoints.ts`/`jwt_interceptor.ts`/
+  `dtos.ts`/`permissions_matrix.md`). تحقّق من منطق الأعلام (`>0` vs `==1`) من
+  `entities/Users.java` + `HakAccessHelper.java` قبل كتابة كود الصلاحيات.
+
+---
+
 ## الجلسة 002 — 2026-05-29 — التحقق من الطابعة + نظام توثيق الوكلاء
 
 **الوكيل:** Lead Architect / Migration Expert.

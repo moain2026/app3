@@ -3,7 +3,8 @@
 > **الغرض:** تحديد القرار المعماري لـ `app3`، واستراتيجية الترحيل من `app1`،
 > وخطة العمل المرحلية لإكمال الـ~60% المتبقّية لتطبيق التحصيل المالي.
 > **تاريخ:** 2026-05-29.
-> **المراجع:** التقارير 01 (تحليل APK) + 02 (تقييم app1) + 03 (مصفوفة الفجوات).
+> **المراجع:** التقارير 01 (تحليل APK v28) + 02 (تقييم app1) + 03 (مصفوفة الفجوات)
+> + **تحليل الباكِند B3** (Oracle/JWT/permissions — انظر AGENTS.md §4).
 
 ---
 
@@ -25,7 +26,7 @@
 | الإطار | React Native 0.74.5 (bare) + TS strict | يُرحَّل كما هو |
 | الحالة | Zustand | يُرحَّل |
 | التخزين المحلي | WatermelonDB (offline-first) | يُرحَّل + توسيع schema |
-| الشبكة | Axios + interceptors | يُرحَّل + envelope/appId |
+| الشبكة | Axios + interceptors (**Bearer JWT** + reauth-on-401) | يُرحَّل + JWT/appId (قالب B3 `jwt_interceptor.ts`) |
 | التحقق | Zod (`*Loose` coercers) | يُرحَّل (صحيح) |
 | الترجمة | i18next (491 مفتاح، RTL) | يُرحَّل |
 | الطباعة | ESC/POS + Bluetooth SPP، cp1256 | يُرحَّل (الطابعة الميدانية: **BIXOLON SPP-R310**) |
@@ -39,12 +40,21 @@
 ## 2. عقد الخادم المُجمَّع (المرجع الموحَّد للتنفيذ)
 
 ```
-BASE_URL = "http://" + IP + ":3000/electric/"     // المنفذ و /electric/ ثابتان
+SERVER   = .NET 4.5.1 WCF (OracleServiceMobile.exe + MProgService.dll) → Oracle (ODP.NET)
+CONTRACT = IServiceElect (الحديث، 33 عملية) — الكلاينت يستخدمه
+BASE_URL = "http://" + IP + ":3000/electric/"     // v28: المنفذ و /electric/ ثابتان
 LIVE     = http://100.87.131.115:3000/electric/   // عبر Tailscale فقط
-ENVELOPE = كل استجابة → { "<Operation>Result": {...} }
-SUCCESS  = LoginResult.error_no === 0
-APPID    = رقم الفرع (افتراضي "1")، camelCase: appId
+AUTH     = JWT Bearer (jose-jwt v5، HS256 غالباً، بلا exp — TTL على الخادم)
+           → Authorization: Bearer <accessToken> على كل عملية محمية؛ reauth على 401
+           → عامل التوكن كـ opaque (لا تفكّه بالكلاينت)
+LOGIN    = POST /Login body {User,Password,appId} (+secureId query)
+           ← الرد DTO=Users يحوي access_token + error_no؛ SUCCESS = error_no === 0
+FAULT    = ServiceFault { Code, Description }
+RESPONSE = أنواع الخادم: Users / ResultPost / List<X> (تحقّق من توقيع ApiService.java)
+APPID    = مُعرّف المستأجر/الفرع (افتراضي "1")، camelCase، على كل طلب
 SECUREID = decimal(first 8 hex of ANDROID_ID)     // بلا XOR
+PERMS    = Tier-A (7 أعلام على USER_R) + Tier-B (USER_MNATK ACL على الخادم)
+TENANT   = appId → Oracle connection string لكل فرع (Dictionary<int,string>)
 ```
 
 ### نقاط النهاية الحرجة (مع معرّفاتها الصحيحة)
@@ -75,9 +85,10 @@ SECUREID = decimal(first 8 hex of ANDROID_ID)     // بلا XOR
 ### 🔴 المرحلة 1 — تصحيح العقد الأساسي (الفجوات الحرجة)
 | المهمّة | الفجوة | الملفات |
 |---|---|---|
-| أداة `unwrapResult()` عامة + مراجعة كل mapper | G-2 | `api/mappers/_envelope.ts` + كل mapper |
+| **JWT interceptor** (حقن Bearer + reauth-on-401، قالب B3) | (جديد/B3) | `services/api/jwtInterceptor.ts` + `auth/tokenStore.ts` |
+| أداة `unwrapResult()` عامة + مراجعة كل mapper (حسب توقيع ApiService.java) | G-2 | `api/mappers/_envelope.ts` + كل mapper |
 | فحص `error_no === 0` في الدخول | G-3 | `auth.mapper.ts` / `authStore.ts` |
-| وحدة صلاحيات HakAccess (`can(module,action)`, isAdmin override) | G-1 | `services/auth/permissions.ts` + guards |
+| وحدة صلاحيات طبقتين (Tier-A 7 أعلام + عرض Tier-B places) | G-1 | `services/auth/permissions.ts` + guards |
 | اختبارات وحدة لكلٍّ مما سبق | — | `__tests__/` |
 
 **معيار القبول:** تسجيل دخول حقيقي ينجح/يفشل بدقّة، والقوائم تُفكّ أغلفتها،
@@ -101,7 +112,7 @@ SECUREID = decimal(first 8 hex of ANDROID_ID)     // بلا XOR
 |---|---|
 | interceptor لحقن `appId` (دعم تعدّد الفروع) | G-5 |
 | اختبار `secureId` (hex8→decimal، بلا XOR) | G-9 |
-| اختبار طابعة ميداني: cp1251 vs cp1256 | D-2 |
+| اختبار طابعة ميداني (BIXOLON SPP-R310، cp1256 محسوم) | D-2/D-2b |
 | Scanner/الكاميرا (مؤجّل) | — |
 | تغطية اختبارات شاملة + e2e أساسي | — |
 
@@ -147,16 +158,15 @@ expo/expo-github-action → eas build --platform android --profile preview
 
 ## 7. ما يحتاج قراراً من المستخدم قبل البدء بالتنفيذ ⚠️
 
-أطرح هذه النقاط الآن (التزاماً بقاعدة "إن غمض شيء توقّف واسأل") قبل كتابة كود `app3`:
+تحديث بعد الردود + تحليل B3 (أغلب النقاط مُحِسمة):
 
-1. **استراتيجية `app3`:** أؤكّد اعتماد **الترحيل من app1** (لا إعادة بناء). موافق؟
-2. **EAS:** هل لديك حساب Expo/EAS وتوكن (`EXPO_TOKEN`)؟ أم أستخدم بناء Android
-   تقليدي عبر Gradle في Actions حتى تجهّز الحساب؟
-3. **الطابعة (D-2):** cp1251 (الأصلي) أم cp1256 (app1) — هل بإمكانك اختبار ميداني
-   على Datecs DPP-250؟ (سأجعلها قابلة للتبديل بإعداد لحين الحسم.)
-4. **تعدّد الفروع (`appId`):** هل النظام أحادي الفرع (appId="1") حالياً، أم نحتاج
-   دعم فروع متعدّدة من الآن؟ (يؤثّر في أولوية G-5.)
+1. **استراتيجية `app3`:** ✅ مُؤكّد — **ترحيل من app1** (المستخدم أكّد).
+2. **EAS:** ✅ محلول — حساب Expo مُنشأ و`EXPO_TOKEN` في GitHub Secrets.
+3. **الطابعة (D-2):** ✅ محسوم — **cp1256** (مؤكد من الأصلي). الطابعة = **BIXOLON SPP-R310**.
+   يبقى اختبار ميداني في M3.
+4. **تعدّد الفروع (`appId`):** ✅ المعنى محسوم — `appId` = مفتاح المستأجر/الفرع
+   (B3 `07_MULTI_TENANT.md`). **يبقى سؤال للمستخدم:** كم فرعاً فعلياً مستخدَم؟
+   (فرع واحد → appId="1" ثابت؛ عدة فروع → شاشة اختيار فرع → ترتفع أولوية G-5.)
 
-> **ملاحظة:** كلمة "كمل/استمر" تعني المتابعة بالخطة كما هي دون انتظار إذن إضافي،
-> وسأفترض الإجابات الافتراضية الآمنة (ترحيل / Gradle مؤقتاً / codepage قابل للتبديل /
-> أحادي الفرع) إن قلت "استمر" دون تحديد.
+> **ملاحظة:** كلمة "كمل/استمر" تعني المتابعة بالخطة كما هي، وسأفترض أحادي الفرع
+> (appId="1") كافتراض آمن إن لم يحدّد المستخدم عدد الفروع.

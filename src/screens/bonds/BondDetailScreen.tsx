@@ -17,8 +17,9 @@
  * "not found" sentinel, and only render the not-found banner once
  * we've received at least one emission with a null payload.
  *
- * Mutation paths (delete / edit / add-payment) still navigate to the
- * existing forms which remain on MOCK data. Wave 6-Γ will wire them.
+ * Bonds are read-only mirrors of the server (legacy GetListBonds), so
+ * there is no on-device delete. A failed local push (e.g. a queued
+ * payment) surfaces an ErrorBanner whose retry triggers pushOnly().
  */
 
 import {
@@ -46,10 +47,10 @@ import { PrimaryButton } from '@/components/forms/PrimaryButton';
 import {
   Card,
   ErrorBanner,
-  MockBanner,
   SecondaryButton,
   SectionHeader,
 } from '@/design-system/components';
+import { pushOnly } from '@/services/sync';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
 import type { Bond } from '@/database/models/Bond';
@@ -175,26 +176,8 @@ export function BondDetailScreen(): React.JSX.Element {
     Alert.alert(t('bonds.detail.print'), t('bonds.detail.printSoon'));
   };
 
-  const handleEdit = (): void => {
-    navigation.navigate('BondEdit', { localUuid: bond.localUuid });
-  };
-
-  const handleDelete = (): void => {
-    Alert.alert(
-      t('bonds.detail.deleteConfirmTitle'),
-      t('bonds.detail.deleteConfirmMsg', { no: bond.bondNo }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.confirm'),
-          style: 'destructive',
-          onPress: () => {
-            // TODO Wave 6-Γ: bondsRepository.delete(bond.localUuid)
-            navigation.goBack();
-          },
-        },
-      ],
-    );
+  const handleRetryPush = (): void => {
+    void pushOnly('connectivity');
   };
 
   const handleAddPayment = (): void => {
@@ -207,13 +190,12 @@ export function BondDetailScreen(): React.JSX.Element {
       edges={['top']}
     >
       <AppHeader title={t('bonds.detail.title')} showBack />
-      <MockBanner />
 
       {syncStatus === 'failed' && bond.lastError ? (
         <ErrorBanner
           message={bond.lastError}
           variant="error"
-          onRetry={() => Alert.alert(t('common.retry'), 'TODO')}
+          onRetry={handleRetryPush}
           retryLabel={t('common.retry')}
         />
       ) : null}
@@ -390,17 +372,6 @@ export function BondDetailScreen(): React.JSX.Element {
         ]}
       >
         <View style={styles.actionBarRow}>
-          <SecondaryButton
-            title={t('common.delete')}
-            icon="trash-2"
-            variant="danger"
-            onPress={handleDelete}
-          />
-          <SecondaryButton
-            title={t('common.edit')}
-            icon="edit-2"
-            onPress={handleEdit}
-          />
           <View style={styles.printBtn}>
             <PrimaryButton
               title={t('bonds.detail.print')}

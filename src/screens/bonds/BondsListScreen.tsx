@@ -42,7 +42,6 @@ import {
   Chip,
   EmptyState,
   FAB,
-  MockBanner,
   SearchBar,
 } from '@/design-system/components';
 import { useTheme } from '@/design-system/theme';
@@ -179,7 +178,6 @@ export function BondsListScreen(): React.JSX.Element {
       edges={['top']}
     >
       <AppHeader title={t('bonds.list.title')} showMenu />
-      <MockBanner />
 
       <View style={styles.toolbar}>
         <SearchBar

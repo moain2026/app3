@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    android:versionCode="1"
+    android:versionName="1.0"
+    android:compileSdkVersion="34"
+    android:compileSdkVersionCodename="14"
+    package="com.yd.electricecollector"
+    platformBuildVersionCode="34"
+    platformBuildVersionName="14">
+    <uses-sdk
+        android:minSdkVersion="24"
+        android:targetSdkVersion="34"/>
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <uses-permission android:name="android.permission.SEND_SMS"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <permission
+        android:name="com.yd.electricecollector.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        android:protectionLevel="signature"/>
+    <uses-permission android:name="com.yd.electricecollector.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"/>
+    <application
+        android:theme="@style/AppTheme"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher_2"
+        android:name="com.p001yd.electricecollector.common.AppConfig"
+        android:debuggable="true"
+        android:allowBackup="true"
+        android:supportsRtl="true"
+        android:extractNativeLibs="false"
+        android:usesCleartextTraffic="true"
+        android:roundIcon="@mipmap/ic_launcher_2_round"
+        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+        android:requestLegacyExternalStorage="true">
+        <activity
+            android:theme="@style/AppTheme.NoActionBar"
+            android:name="com.p001yd.electricecollector.SplashScreenActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter"/>
+        </activity>
+        <activity android:name="com.p001yd.electricecollector.LoginActivity"/>
+        <activity
+            android:theme="@style/AppTheme.NoActionBar"
+            android:name="com.p001yd.electricecollector.MainActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.BalanceStateReportActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.BondsHeaderReportActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.ViewSettingActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.BalanceStateDetailsReportActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.BoxMovesReportActivity"/>
+        <activity android:name="com.p001yd.electricecollector.printer.andoirdbluetoothprint.MainActivity"/>
+        <activity android:name="com.p001yd.electricecollector.printer.andoirdbluetoothprint.DeviceListActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.BoxMovesDetailsReportActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.ExpensesReportActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.ListBondsActivity"/>
+        <activity
+            android:name="com.p001yd.electricecollector.p002ui.EntryBondsActivity"
+            android:parentActivityName="com.yd.electricecollector.ui.ListBondsActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.LookupAccountsActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.LookupPleasesActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.tools.LookupGroupsActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.ListBondsPaymentActivity"/>
+        <activity
+            android:name="com.p001yd.electricecollector.p002ui.EntryBondsPaymentActivity"
+            android:parentActivityName="com.yd.electricecollector.ui.ListBondsPaymentActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.ViewPeriodActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.ListReadingActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.ListBondsReportActivity"/>
+        <activity android:name="com.p001yd.electricecollector.p002ui.ListReadingReportActivity"/>
+        <activity android:name="com.p001yd.electricecollector.ActivitySMS"/>
+        <activity
+            android:theme="@style/SettingsTheme"
+            android:label="@string/titlePreferences"
+            android:name="com.p001yd.electricecollector.Preferences"/>
+        <activity android:name="com.p001yd.electricecollector.AboutActivity"/>
+        <activity android:name="com.p001yd.electricecollector.EnterPasswordActivity"/>
+        <activity android:name="com.p001yd.electricecollector.ChangePasswordActivity"/>
+        <activity android:name="com.p001yd.electricecollector.LogoActivity"/>
+        <activity
+            android:name="com.p001yd.electricecollector.printer.bluetooth.PrinterActivity"
+            android:configChanges="orientation|keyboardHidden"/>
+        <activity
+            android:name="com.p001yd.electricecollector.printer.andoirdbluetoothprint.PrinterActivity"
+            android:configChanges="orientation|keyboardHidden"/>
+        <activity
+            android:name="com.p001yd.electricecollector.printer.bluetooth.ScanActivity"
+            android:configChanges="orientation|keyboardHidden"/>
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:exported="false"
+            android:authorities=".file provider"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"/>
+        </provider>
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:exported="false"
+            android:authorities="com.yd.electricecollector.androidx-startup">
+            <meta-data
+                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+                android:value="androidx.startup"/>
+            <meta-data
+                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+                android:value="androidx.startup"/>
+            <meta-data
+                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+                android:value="androidx.startup"/>
+        </provider>
+        <uses-library
+            android:name="androidx.window.extensions"
+            android:required="false"/>
+        <uses-library
+            android:name="androidx.window.sidecar"
+            android:required="false"/>
+        <receiver
+            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+            android:permission="android.permission.DUMP"
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="false">
+            <intent-filter>
+                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="androidx.profileinstaller.action.SKIP_FILE"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION"/>
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

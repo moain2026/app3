@@ -11,13 +11,8 @@
  *   • الصلاحيات   → Permissions
  *   • عن التطبيق  → About
  *
- * Wave 6-Α — UI skeleton.
- *
- * TODO Wave 6-Β:
- *   • Add 'الحساب' section (change password / change PIN / logout).
- *   • Add 'المظهر' section (theme + font size).
- *   • Add 'اللغة' section.
- *   • Wire icon badges showing un-configured sections.
+ * Each entry navigates to its dedicated, fully-wired screen (company_info
+ * observe, server prefs read/write, OS runtime permissions, printer config).
  */
 
 import { useNavigation } from '@react-navigation/native';

@@ -8,24 +8,30 @@
  *   • Provides one-shot fetches for stats badges.
  *   • Exposes a `findByUuid` lookup for detail screens.
  *
- * MUTATION SCOPE — Wave 6-Β
- *   We intentionally do NOT add `createBond` / `updateBond` / `deleteBond`
- *   here. The Bond entity is still wave-6-α shape (13 fields); the live
- *   WCF mutation contract has not been finalized (waiting on the user's
- *   WCF Help dump for `ItemBonds`). The bond forms (`BondFormScreen`,
- *   `BondPaymentFormScreen`) therefore remain on their existing MOCK
- *   data path until Wave 6-Γ wires the proper push handler.
+ * MUTATION SCOPE
+ *   `createBond` / `updateBond` write a local `bonds` row (mirroring the
+ *   legacy `ItemBonds` columns exactly — see `EntryBondsActivity.save()`)
+ *   and enqueue a `SaveBond` / `UpdateBond` push via `enqueueBondSave`.
+ *   The legacy app DOES let collectors create receipt/payment bonds
+ *   on-device (POST /SaveBond, PUT /UpdateBond — both confirmed live on
+ *   the WCF Help contract), so the forms are wired to real persistence.
  *
- *   For READ paths (list + detail + pickers), `bonds` populated by the
- *   dev-bypass seeder behaves exactly like server-pulled rows, so the
- *   UI can be wired to observables today without any contract risk.
+ *   For READ paths (list + detail + pickers), `bonds` populated by either
+ *   the server pull or the dev-bypass seeder behaves identically.
  */
 
 import { Q } from '@nozbe/watermelondb';
 import { Observable, map } from 'rxjs';
+import { v4 as uuidv4 } from 'uuid';
 
 import { database } from '@/database';
 import type { Bond } from '@/database/models/Bond';
+import { enqueueBondSave } from '@/services/sync/enqueueHelpers';
+import { getCollectorNoa } from '@/services/storage/prefs';
+import { useAuthStore } from '@/stores/authStore';
+import { logger } from '@/utils/logger';
+
+const log = logger.scope('BondsRepo');
 
 // ─── Filter & sort types ──────────────────────────────────────────────────
 
@@ -223,4 +229,136 @@ export function observeBondStats(): Observable<BondsStats> {
         return stats;
       }),
     );
+}
+
+// ─── Mutations (create / update) ──────────────────────────────────────────
+
+/** User-facing input for creating/updating a bond. */
+export interface BondInput {
+  /** 'receipt' (قبض، type=1) or 'payment' (صرف، type=2). */
+  bondType: 'receipt' | 'payment';
+  /** Account record id (legacy num) — the subscriber/supplier. */
+  accountNum?: number | null;
+  /** Account display name (legacy name). */
+  accountName: string;
+  /** Human document/bond number (legacy nmstnd). */
+  docNo?: string | null;
+  /** Currency id (legacy currencyid). Defaults to 1 (base). */
+  currencyId?: number;
+  currencyName?: string | null;
+  /** Headline amount. Mirrors legacy dain/mden/equal/rsed. */
+  amount: number;
+  /** Free-text note typed by the collector (legacy bin). */
+  notes?: string | null;
+}
+
+/**
+ * Build the auto-generated notes string EXACTLY like the legacy
+ * `EntryBondsActivity.save()`:
+ *   notes = " لكم مسلم بيد <collectorName> عبر الموبايل  <typedNote>"
+ * We only attach the collector prefix for receipt bonds (قبض) to mirror
+ * the legacy flow; payment bonds keep the typed note verbatim.
+ */
+function buildBondNotes(input: BondInput, collectorName: string): string {
+  const typed = input.notes ?? '';
+  if (input.bondType === 'receipt' && collectorName) {
+    return ` لكم مسلم بيد ${collectorName} عبر الموبايل  ${typed}`;
+  }
+  return typed;
+}
+
+/** Map a BondInput onto the legacy ItemBonds columns of a `Bond` row. */
+function applyInputToRow(
+  row: Bond,
+  input: BondInput,
+  collectorName: string,
+  collectorNoa: number,
+): void {
+  row.numS = collectorNoa; // box/cashier number (legacy num_s = NOA)
+  row.nameS = collectorName || null; // box/cashier name (legacy name_s)
+  row.nmstnd = input.docNo != null ? String(input.docNo) : null;
+  row.name = input.accountName;
+  row.type = input.bondType === 'receipt' ? 1 : 2;
+  row.cas = 0; // unposted on creation
+  row.mdate = new Date().toISOString();
+  // Legacy: setDain(amount); setRsed(amount); setEqual(amount).
+  if (input.bondType === 'receipt') {
+    row.dain = input.amount;
+    row.mden = 0;
+  } else {
+    row.dain = 0;
+    row.mden = input.amount;
+  }
+  row.equal = input.amount;
+  row.balance = input.amount; // rsed
+  row.priceTrans = 1; // legacy setPriceTrans(1.0)
+  row.currencyid = input.currencyId ?? 1;
+  row.currencyname = input.currencyName ?? null;
+  row.notes = buildBondNotes(input, collectorName);
+  row.notesBox = null;
+  row.notes2 = input.notes ?? null; // bin (the raw typed note)
+  row.finalbalance = 0;
+}
+
+/**
+ * Create a new bond locally and enqueue a `SaveBond` push.
+ *
+ * Mirrors `EntryBondsActivity.save()` (presenter.save):
+ *   • Writes a fresh `bonds` row with the legacy ItemBonds field layout.
+ *   • Marks it `dirty` and enqueues a `create` operation.
+ *   • Fires a best-effort `pushOnly('after_write')`.
+ *
+ * Returns the persisted Bond model (with a stable `local_uuid`).
+ */
+export async function createBond(input: BondInput): Promise<Bond> {
+  const user = useAuthStore.getState().user;
+  const collectorName = user?.name ?? user?.username ?? '';
+  const collectorNoa = getCollectorNoa() ?? user?.noa ?? 0;
+  const localUuid = uuidv4();
+
+  const bondCol = database.collections.get<Bond>('bonds');
+  let created: Bond | null = null;
+  await database.write(async () => {
+    created = await bondCol.create((row) => {
+      row.localUuid = localUuid;
+      applyInputToRow(row, input, collectorName, collectorNoa);
+      row.pushStatus = 'dirty';
+      row.syncAttempts = 0;
+    });
+  });
+
+  if (created == null) {
+    throw new Error('createBond: row was not persisted');
+  }
+  log.info('bond created', { uuid: localUuid, type: input.bondType });
+  await enqueueBondSave(created);
+  return created;
+}
+
+/**
+ * Update an existing bond (by local_uuid) and enqueue an `UpdateBond`
+ * push. Throws if the bond cannot be found.
+ */
+export async function updateBond(
+  localUuid: string,
+  input: BondInput,
+): Promise<Bond> {
+  const target = await findBondByUuid(localUuid);
+  if (target == null) {
+    throw new Error(`updateBond: bond ${localUuid} not found`);
+  }
+  const user = useAuthStore.getState().user;
+  const collectorName = user?.name ?? user?.username ?? '';
+  const collectorNoa = getCollectorNoa() ?? user?.noa ?? target.numS ?? 0;
+
+  await database.write(async () => {
+    await target.update((row) => {
+      applyInputToRow(row, input, collectorName, collectorNoa);
+      row.pushStatus = 'dirty';
+    });
+  });
+
+  log.info('bond updated', { uuid: localUuid, type: input.bondType });
+  await enqueueBondSave(target);
+  return target;
 }

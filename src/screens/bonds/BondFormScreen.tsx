@@ -5,41 +5,15 @@
  *   • BondCreate(defaultType: 'receipt' | 'payment')
  *   • BondEdit(localUuid)
  *
- * Visual flow (RTL):
- *
- *  ┌────────────────────────────────────────────────────────────────┐
- *  │  [AppHeader: سند جديد / تعديل سند]                            │
- *  │  [MockBanner]                                                  │
- *  │  ──────────────────────────────                                │
- *  │  [SectionHeader: نوع السند]                                   │
- *  │  [Chip: قبض] [Chip: صرف]                                       │
- *  │  ──────────────────────────────                                │
- *  │  [SectionHeader: المشترك]                                     │
- *  │  [FormField: المشترك (readOnly → AccountPicker)]              │
- *  │  ──────────────────────────────                                │
- *  │  [SectionHeader: المبلغ]                                      │
- *  │  [FormField: العملة (readOnly → CurrencyPicker)]              │
- *  │  [FormField: المبلغ]                                          │
- *  │  ──────────────────────────────                                │
- *  │  [SectionHeader: ملاحظات]                                     │
- *  │  [FormField: ملاحظة (multiline)]                              │
- *  │  ──────────────────────────────                                │
- *  │  [PrimaryButton: حفظ]                                          │
- *  └────────────────────────────────────────────────────────────────┘
- *
- * TODO (Wave 6-Β):
- *   • Wire react-hook-form + Zod schema (bondInputSchema) for validation.
- *   • Pull defaults from `findMockBond(localUuid)` when editing.
- *   • On submit → bondsRepository.create / update + enqueue sync.
- *   • Auto-fetch GetBondReceiptRecordNext for the bondNo before save.
- *   • Multi-currency: fetch GetAccountBalanceInfo when account changes.
- *
- * Wave 6-Α — UI skeleton.
+ * Wired to REAL persistence (mirrors legacy `EntryBondsActivity.save()`):
+ *   • Create  → bondsRepository.createBond → local `bonds` row + SaveBond push.
+ *   • Edit    → bondsRepository.updateBond → local row update + UpdateBond push.
+ *   • Account + currency pickers feed from the live WatermelonDB tables.
  */
 
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -54,18 +28,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { PrimaryButton } from '@/components/forms/PrimaryButton';
 import { AccountPicker, CurrencyPicker } from '@/components/pickers';
-import {
-  Chip,
-  FormField,
-  MockBanner,
-  SectionHeader,
-} from '@/design-system/components';
+import { Chip, FormField, SectionHeader } from '@/design-system/components';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
 import type { MockAccount } from '@/mocks/accounts';
-import { findMockBond } from '@/mocks/bonds';
 import { findMockCurrency, type MockCurrency } from '@/mocks/currencies';
 import type { MainStackParamList } from '@/navigation/types';
+import {
+  createBond,
+  findBondByUuid,
+  updateBond,
+  type BondInput,
+} from '@/services/repository/bondsRepository';
+import { AppError } from '@/utils/errors';
 
 type Route =
   | RouteProp<MainStackParamList, 'BondCreate'>
@@ -78,48 +53,100 @@ export function BondFormScreen(): React.JSX.Element {
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 
-  // Detect mode + load existing bond if editing.
   const isEdit = route.name === 'BondEdit';
-  const existing = isEdit
-    ? findMockBond((route.params as { localUuid: string }).localUuid)
-    : undefined;
+  const editUuid = isEdit
+    ? (route.params as { localUuid: string }).localUuid
+    : null;
   const defaultType =
-    (!isEdit && (route.params as { defaultType?: 'receipt' | 'payment' }).defaultType) ||
-    existing?.bondType ||
+    (!isEdit &&
+      (route.params as { defaultType?: 'receipt' | 'payment' }).defaultType) ||
     'receipt';
 
-  // Form state (local only in Wave 6-Α).
+  // Form state.
   const [bondType, setBondType] = useState<'receipt' | 'payment'>(defaultType);
   const [account, setAccount] = useState<MockAccount | null>(null);
-  const [accountLabel, setAccountLabel] = useState<string>(
-    existing?.accountName ?? '',
-  );
+  const [accountNum, setAccountNum] = useState<number | null>(null);
+  const [accountLabel, setAccountLabel] = useState<string>('');
   const [currency, setCurrency] = useState<MockCurrency | null>(
-    findMockCurrency(existing?.currencyId ?? 1) ?? null,
+    findMockCurrency(1) ?? null,
   );
-  const [amount, setAmount] = useState<string>(
-    existing ? String(existing.amount) : '',
-  );
-  const [notes, setNotes] = useState<string>(existing?.notes ?? '');
+  const [amount, setAmount] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
 
-  // Picker visibility.
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState<boolean>(isEdit);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const handleSubmit = (): void => {
-    // TODO Wave 6-Β: zodResolver + bondsRepository.create/update
-    if (!accountLabel || !amount || !currency) {
-      Alert.alert(
-        t('bonds.form.validationTitle'),
-        t('bonds.form.validationMsg'),
-      );
+  // ─── Hydrate from the real DB row when editing ──────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    if (!editUuid) {
+      setLoadingExisting(false);
       return;
     }
-    Alert.alert(
-      t('bonds.form.savedTitle'),
-      isEdit ? t('bonds.form.savedEdit') : t('bonds.form.savedCreate'),
-      [{ text: t('common.ok'), onPress: () => navigation.goBack() }],
-    );
+    void (async () => {
+      const row = await findBondByUuid(editUuid);
+      if (cancelled || row == null) {
+        if (!cancelled) {
+          setLoadingExisting(false);
+        }
+        return;
+      }
+      setBondType(row.bondType);
+      setAccountLabel(row.name ?? '');
+      setAccountNum(row.num ?? null);
+      setCurrency(findMockCurrency(row.currencyid) ?? null);
+      setAmount(String(row.amount));
+      // notes2 holds the raw typed note (bin); fall back to notes.
+      setNotes(row.notes2 ?? row.notes ?? '');
+      setLoadingExisting(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editUuid]);
+
+  const handleSubmit = async (): Promise<void> => {
+    if (!accountLabel || !amount || !currency) {
+      Alert.alert(t('bonds.form.validationTitle'), t('bonds.form.validationMsg'));
+      return;
+    }
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      Alert.alert(t('bonds.form.validationTitle'), t('bonds.form.validationMsg'));
+      return;
+    }
+
+    const input: BondInput = {
+      bondType,
+      accountNum: accountNum ?? account?.id ?? null,
+      accountName: accountLabel,
+      currencyId: currency.id,
+      currencyName: currency.name,
+      amount: numericAmount,
+      notes: notes.trim() === '' ? null : notes.trim(),
+    };
+
+    setSubmitting(true);
+    try {
+      if (isEdit && editUuid) {
+        await updateBond(editUuid, input);
+      } else {
+        await createBond(input);
+      }
+      Alert.alert(
+        t('bonds.form.savedTitle'),
+        isEdit ? t('bonds.form.savedEdit') : t('bonds.form.savedCreate'),
+        [{ text: t('common.ok'), onPress: () => navigation.goBack() }],
+      );
+    } catch (e) {
+      const msg =
+        e instanceof AppError ? e.userMessage : t('bonds.form.saveFailed');
+      Alert.alert(t('bonds.form.savedTitle'), msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -131,7 +158,6 @@ export function BondFormScreen(): React.JSX.Element {
         title={isEdit ? t('bonds.form.editTitle') : t('bonds.form.createTitle')}
         showBack
       />
-      <MockBanner />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -142,10 +168,7 @@ export function BondFormScreen(): React.JSX.Element {
           keyboardShouldPersistTaps="handled"
         >
           {/* TYPE SELECTOR */}
-          <SectionHeader
-            title={t('bonds.form.typeSection')}
-            icon="repeat"
-          />
+          <SectionHeader title={t('bonds.form.typeSection')} icon="repeat" />
           <View style={styles.typeRow}>
             <Chip
               label={t('bonds.types.receipt')}
@@ -160,10 +183,7 @@ export function BondFormScreen(): React.JSX.Element {
           </View>
 
           {/* ACCOUNT */}
-          <SectionHeader
-            title={t('bonds.form.accountSection')}
-            icon="user"
-          />
+          <SectionHeader title={t('bonds.form.accountSection')} icon="user" />
           <FormField
             label={t('bonds.form.accountLabel')}
             value={accountLabel}
@@ -176,7 +196,9 @@ export function BondFormScreen(): React.JSX.Element {
           {account && account.balance !== 0 ? (
             <FormField
               label={t('bonds.form.currentBalance')}
-              value={`${Math.abs(account.balance).toLocaleString('ar-EG')} ${currency?.symbol ?? ''}`}
+              value={`${Math.abs(account.balance).toLocaleString('ar-EG')} ${
+                currency?.symbol ?? ''
+              }`}
               helperText={
                 account.balance > 0
                   ? t('bonds.form.balanceDebtor')
@@ -187,10 +209,7 @@ export function BondFormScreen(): React.JSX.Element {
           ) : null}
 
           {/* AMOUNT */}
-          <SectionHeader
-            title={t('bonds.form.amountSection')}
-            icon="dollar-sign"
-          />
+          <SectionHeader title={t('bonds.form.amountSection')} icon="dollar-sign" />
           <FormField
             label={t('bonds.form.currencyLabel')}
             value={currency ? `${currency.symbol} — ${currency.name}` : ''}
@@ -211,10 +230,7 @@ export function BondFormScreen(): React.JSX.Element {
           />
 
           {/* NOTES */}
-          <SectionHeader
-            title={t('bonds.form.notesSection')}
-            icon="message-square"
-          />
+          <SectionHeader title={t('bonds.form.notesSection')} icon="message-square" />
           <FormField
             label={t('bonds.form.notesLabel')}
             value={notes}
@@ -227,10 +243,12 @@ export function BondFormScreen(): React.JSX.Element {
           {/* SUBMIT */}
           <View style={styles.submitWrap}>
             <PrimaryButton
-              title={
-                isEdit ? t('common.save') : t('bonds.form.createCta')
-              }
-              onPress={handleSubmit}
+              title={isEdit ? t('common.save') : t('bonds.form.createCta')}
+              onPress={() => {
+                void handleSubmit();
+              }}
+              loading={submitting || loadingExisting}
+              disabled={submitting || loadingExisting}
             />
           </View>
         </ScrollView>
@@ -242,6 +260,7 @@ export function BondFormScreen(): React.JSX.Element {
         onClose={() => setShowAccountPicker(false)}
         onSelect={(a) => {
           setAccount(a);
+          setAccountNum(a.id);
           setAccountLabel(`${a.name} (${a.num})`);
           setShowAccountPicker(false);
         }}

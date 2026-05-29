@@ -51,7 +51,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          # NOTE: no `cache: npm` — repo has no package-lock.json yet, which
+          # makes the cache step fail. Re-enable once a lockfile is committed.
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
@@ -70,13 +71,17 @@ jobs:
 
       - name: Determine build variant
         id: variant
+        shell: bash
         run: |
           VARIANT="${{ github.event.inputs.build_type }}"
           if [ -z "$VARIANT" ]; then VARIANT="release"; fi
           echo "variant=$VARIANT" >> "$GITHUB_OUTPUT"
           # Gradle task name: assembleRelease / assembleDebug
-          TASK="assemble$(echo ${VARIANT^})"
-          echo "task=$TASK" >> "$GITHUB_OUTPUT"
+          if [ "$VARIANT" = "debug" ]; then
+            echo "task=assembleDebug" >> "$GITHUB_OUTPUT"
+          else
+            echo "task=assembleRelease" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build APK (${{ steps.variant.outputs.variant }})
         working-directory: android

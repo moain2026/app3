@@ -23,7 +23,7 @@
 
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const schema = appSchema({
   version: SCHEMA_VERSION,
@@ -75,19 +75,36 @@ export const schema = appSchema({
      * ════════════════════════════════════════════════════════════════════ */
     tableSchema({
       name: 'bonds',
+      // ⭐ Columns mirror entities/ItemBonds.java (v28) VERBATIM — ISS-12.
+      //   num num_s nmstnd name name_s type cas mdate dain mden equal balance
+      //   price_trans currencyid currencyname branchid userid notes notes_box
+      //   notes2 nref nref_docno finalbalance
       columns: [
         { name: 'local_uuid', type: 'string', isIndexed: true },
-        { name: 'remote_id', type: 'number', isOptional: true, isIndexed: true },
 
-        { name: 'bond_no', type: 'number', isIndexed: true }, // رقم السند
-        { name: 'bond_type', type: 'string' }, // نوع السند (مقبوض/مدفوع)
-        { name: 'account_id', type: 'number', isOptional: true, isIndexed: true },
-        { name: 'account_name', type: 'string', isOptional: true },
-        { name: 'currency_id', type: 'number', isOptional: true },
-        { name: 'amount', type: 'number' },
-        { name: 'amount_paid', type: 'number' }, // sum of bond_payments
+        { name: 'num', type: 'number', isOptional: true, isIndexed: true }, // bond record id (remote)
+        { name: 'num_s', type: 'number' }, // box/cashier number
+        { name: 'nmstnd', type: 'string', isOptional: true, isIndexed: true }, // document/bond number (string)
+        { name: 'name', type: 'string', isOptional: true }, // account name
+        { name: 'name_s', type: 'string', isOptional: true }, // box/cashier name
+        { name: 'type', type: 'number', isIndexed: true }, // bond type (1=receipt...)
+        { name: 'cas', type: 'number', isIndexed: true }, // posting status (0=unposted)
+        { name: 'mdate', type: 'string', isOptional: true }, // bond date (legacy string)
+        { name: 'dain', type: 'number' }, // debit
+        { name: 'mden', type: 'number' }, // credit
+        { name: 'equal', type: 'number' }, // equivalent amount
+        { name: 'balance', type: 'number' }, // running balance (rsed)
+        { name: 'price_trans', type: 'number' }, // exchange/transfer price
+        { name: 'currencyid', type: 'number' },
+        { name: 'currencyname', type: 'string', isOptional: true },
+        { name: 'branchid', type: 'string', isOptional: true },
+        { name: 'userid', type: 'string', isOptional: true },
         { name: 'notes', type: 'string', isOptional: true },
-        { name: 'bond_date', type: 'number' }, // تاريخ السند
+        { name: 'notes_box', type: 'string', isOptional: true },
+        { name: 'notes2', type: 'string', isOptional: true }, // bin
+        { name: 'nref', type: 'string', isOptional: true },
+        { name: 'nref_docno', type: 'string', isOptional: true },
+        { name: 'finalbalance', type: 'number' },
 
         // sync
         { name: 'sync_status', type: 'string', isIndexed: true },

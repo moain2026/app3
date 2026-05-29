@@ -74,18 +74,44 @@ async function doSeed(): Promise<void> {
       const creates = MOCK_BONDS.map((mock) =>
         bondCol.prepareCreate((row) => {
           row.localUuid = mock.localUuid;
+          // ─── Map MockBond → legacy ItemBonds columns (ISS-12) ───────────
+          //   remoteId → num
+          //   bondType ('receipt'|'payment') → type (1=receipt)
+          //   bondNo (number) → nmstnd (string document no)
+          //   accountName → name
+          //   amount → equal + dain (receipt) / mden (payment)
+          //   currencyId → currencyid
+          //   bondDate (ISO) → mdate (string)
           if (mock.remoteId != null) {
-            row.remoteId = mock.remoteId;
+            row.num = mock.remoteId;
           }
-          row.bondNo = mock.bondNo;
-          row.bondType = mock.bondType;
-          row.accountId = mock.accountId;
-          row.accountName = mock.accountName;
-          row.currencyId = mock.currencyId;
-          row.amount = mock.amount;
-          row.amountPaid = mock.amountPaid;
+          row.numS = mock.accountId ?? 0;
+          row.nmstnd = String(mock.bondNo);
+          row.name = mock.accountName;
+          row.nameS = mock.accountNum ?? null;
+          row.type = mock.bondType === 'receipt' ? 1 : 2;
+          row.cas = 0; // unposted in the mock world
+          row.mdate = mock.bondDate;
+          if (mock.bondType === 'receipt') {
+            row.dain = mock.amount;
+            row.mden = 0;
+          } else {
+            row.dain = 0;
+            row.mden = mock.amount;
+          }
+          row.equal = mock.amount;
+          row.balance = 0;
+          row.priceTrans = 0;
+          row.currencyid = mock.currencyId;
+          row.currencyname = mock.currencySymbol ?? null;
+          row.branchid = null;
+          row.userid = mock.userId != null ? String(mock.userId) : null;
           row.notes = mock.notes ?? null;
-          row.bondDate = new Date(mock.bondDate);
+          row.notesBox = null;
+          row.notes2 = null;
+          row.nref = null;
+          row.nrefDocNo = mock.refDocNo ?? null;
+          row.finalbalance = 0;
           // sync state mapping — MockBond uses 'synced'|'dirty'|'failed';
           // PushStatus union includes 'pristine'|'syncing' too. We only
           // ever seed the three terminal states.

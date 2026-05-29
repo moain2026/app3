@@ -268,39 +268,82 @@ export function parseCurrencyList(raw: unknown): CurrencyDomain[] {
 // Bond
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ⭐ Field names mirror entities/ItemBonds.java (v28) VERBATIM — ISS-12.
 export interface BondDomain {
-  remoteId: number;
-  bondNo: number;
-  bondType: string;
-  accountId: number | null;
-  accountName: string | null;
-  currencyId: number | null;
-  amount: number;
-  amountPaid: number;
+  /** Backend `num` — bond record id (remote). */
+  num: number;
+  /** Backend `num_s` — box/cashier number. */
+  numS: number;
+  /** Backend `nmstnd` — document/bond number (string). */
+  nmstnd: string | null;
+  /** Backend `name` — account name. */
+  name: string | null;
+  /** Backend `name_s` — box/cashier name. */
+  nameS: string | null;
+  /** Backend `type` — bond type (1=receipt). */
+  type: number;
+  /** Backend `cas` — posting status. */
+  cas: number;
+  /** Backend `mdate` — bond date (legacy string). */
+  mdate: string | null;
+  /** Backend `dain` — debit. */
+  dain: number;
+  /** Backend `mden` — credit. */
+  mden: number;
+  /** Backend `equal` — equivalent amount. */
+  equal: number;
+  /** Backend `balance` — running balance (rsed). */
+  balance: number;
+  /** Backend `price_trans`. */
+  priceTrans: number;
+  /** Backend `currencyid`. */
+  currencyid: number;
+  /** Backend `currencyname`. */
+  currencyname: string | null;
+  /** Backend `branchid`. */
+  branchid: string | null;
+  /** Backend `userid`. */
+  userid: string | null;
+  /** Backend `notes`. */
   notes: string | null;
-  bondDate: Date | null;
-}
-
-function parseLooseDate(s: string | undefined | null): Date | null {
-  if (!s) return null;
-  const normalized = s.includes('T') ? s : s.replace(' ', 'T');
-  const d = new Date(normalized);
-  return Number.isNaN(d.getTime()) ? null : d;
+  /** Backend `notes_box`. */
+  notesBox: string | null;
+  /** Backend `notes2` — bin. */
+  notes2: string | null;
+  /** Backend `nref`. */
+  nref: string | null;
+  /** Backend `nref_docno`. */
+  nrefDocNo: string | null;
+  /** Backend `finalbalance`. */
+  finalbalance: number;
 }
 
 export function parseBondList(raw: unknown): BondDomain[] {
   return unwrapList(BondListResponseSchema, BondDtoSchema, raw).map(
     (dto): BondDomain => ({
-      remoteId: dto.id,
-      bondNo: dto.bond_no,
-      bondType: dto.bond_type,
-      accountId: dto.account_id ?? null,
-      accountName: dto.account_name ?? null,
-      currencyId: dto.currency_id ?? null,
-      amount: dto.amount,
-      amountPaid: dto.amount_paid,
+      num: dto.num,
+      numS: dto.num_s,
+      nmstnd: dto.nmstnd ?? null,
+      name: dto.name,
+      nameS: dto.name_s ?? null,
+      type: dto.type,
+      cas: dto.cas,
+      mdate: dto.mdate ?? null,
+      dain: dto.dain,
+      mden: dto.mden,
+      equal: dto.equal,
+      balance: dto.balance,
+      priceTrans: dto.price_trans,
+      currencyid: dto.currencyid,
+      currencyname: dto.currencyname ?? null,
+      branchid: dto.branchid ?? null,
+      userid: dto.userid ?? null,
       notes: dto.notes ?? null,
-      bondDate: parseLooseDate(dto.bond_date),
+      notesBox: dto.notes_box ?? null,
+      notes2: dto.notes2 ?? null,
+      nref: dto.nref ?? null,
+      nrefDocNo: dto.nref_docno ?? null,
+      finalbalance: dto.finalbalance,
     }),
   );
 }
@@ -309,28 +352,41 @@ export function parseBondList(raw: unknown): BondDomain[] {
 // Bond payment
 // ═══════════════════════════════════════════════════════════════════════════
 
-export interface BondPaymentDomain {
-  remoteId: number;
-  bondRemoteId: number;
-  bondNo: number;
-  amount: number;
-  paymentMethod: string | null;
-  referenceNo: string | null;
-  notes: string | null;
-  paymentDate: Date | null;
-}
+// Bond payment shares the ItemBonds wire shape (GetListBondsPayment →
+// BondsPaymentResponse). Same domain as BondDomain; `type` distinguishes
+// payment vs receipt.
+export type BondPaymentDomain = BondDomain;
 
 export function parseBondPaymentList(raw: unknown): BondPaymentDomain[] {
-  return unwrapList(BondPaymentListResponseSchema, BondPaymentDtoSchema, raw).map(
+  return unwrapList(
+    BondPaymentListResponseSchema,
+    BondPaymentDtoSchema,
+    raw,
+  ).map(
     (dto): BondPaymentDomain => ({
-      remoteId: dto.id,
-      bondRemoteId: dto.bond_id,
-      bondNo: dto.bond_no,
-      amount: dto.amount,
-      paymentMethod: dto.payment_method ?? null,
-      referenceNo: dto.reference_no ?? null,
+      num: dto.num,
+      numS: dto.num_s,
+      nmstnd: dto.nmstnd ?? null,
+      name: dto.name,
+      nameS: dto.name_s ?? null,
+      type: dto.type,
+      cas: dto.cas,
+      mdate: dto.mdate ?? null,
+      dain: dto.dain,
+      mden: dto.mden,
+      equal: dto.equal,
+      balance: dto.balance,
+      priceTrans: dto.price_trans,
+      currencyid: dto.currencyid,
+      currencyname: dto.currencyname ?? null,
+      branchid: dto.branchid ?? null,
+      userid: dto.userid ?? null,
       notes: dto.notes ?? null,
-      paymentDate: parseLooseDate(dto.payment_date),
+      notesBox: dto.notes_box ?? null,
+      notes2: dto.notes2 ?? null,
+      nref: dto.nref ?? null,
+      nrefDocNo: dto.nref_docno ?? null,
+      finalbalance: dto.finalbalance,
     }),
   );
 }

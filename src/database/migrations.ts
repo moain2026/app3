@@ -63,5 +63,72 @@ export const migrations = schemaMigrations({
         ),
       ],
     },
+
+    // ─── v2 → v3: realign `bonds` table to entities/ItemBonds.java ─────────
+    // Replaces the imagined bond model (bond_no/bond_type/amount/amount_paid/
+    // account_id) with the legacy server shape (num/num_s/nmstnd/name/type/cas/
+    // dain/mden/equal/balance/currencyid...). Bonds pulled from the server are
+    // a mirror; locally-created (dirty) bonds are rare in dev — recreating the
+    // table is acceptable for this migration stage (ISS-12).
+    {
+      toVersion: 3,
+      steps: [
+        unsafeExecuteSql('DROP TABLE IF EXISTS "bonds";'),
+        unsafeExecuteSql(
+          'CREATE TABLE "bonds" (' +
+            '"id" TEXT PRIMARY KEY NOT NULL, ' +
+            '"_changed" TEXT, ' +
+            '"_status" TEXT, ' +
+            '"local_uuid" TEXT, ' +
+            '"num" INTEGER, ' +
+            '"num_s" INTEGER, ' +
+            '"nmstnd" TEXT, ' +
+            '"name" TEXT, ' +
+            '"name_s" TEXT, ' +
+            '"type" INTEGER, ' +
+            '"cas" INTEGER, ' +
+            '"mdate" TEXT, ' +
+            '"dain" INTEGER, ' +
+            '"mden" INTEGER, ' +
+            '"equal" INTEGER, ' +
+            '"balance" INTEGER, ' +
+            '"price_trans" INTEGER, ' +
+            '"currencyid" INTEGER, ' +
+            '"currencyname" TEXT, ' +
+            '"branchid" TEXT, ' +
+            '"userid" TEXT, ' +
+            '"notes" TEXT, ' +
+            '"notes_box" TEXT, ' +
+            '"notes2" TEXT, ' +
+            '"nref" TEXT, ' +
+            '"nref_docno" TEXT, ' +
+            '"finalbalance" INTEGER, ' +
+            '"sync_status" TEXT, ' +
+            '"last_sync_attempt_at" INTEGER, ' +
+            '"last_error" TEXT, ' +
+            '"sync_attempts" INTEGER, ' +
+            '"created_at" INTEGER, ' +
+            '"updated_at" INTEGER);',
+        ),
+        unsafeExecuteSql(
+          'CREATE INDEX IF NOT EXISTS "bonds_local_uuid" ON "bonds" ("local_uuid");',
+        ),
+        unsafeExecuteSql(
+          'CREATE INDEX IF NOT EXISTS "bonds_num" ON "bonds" ("num");',
+        ),
+        unsafeExecuteSql(
+          'CREATE INDEX IF NOT EXISTS "bonds_nmstnd" ON "bonds" ("nmstnd");',
+        ),
+        unsafeExecuteSql(
+          'CREATE INDEX IF NOT EXISTS "bonds_type" ON "bonds" ("type");',
+        ),
+        unsafeExecuteSql(
+          'CREATE INDEX IF NOT EXISTS "bonds_cas" ON "bonds" ("cas");',
+        ),
+        unsafeExecuteSql(
+          'CREATE INDEX IF NOT EXISTS "bonds_sync_status" ON "bonds" ("sync_status");',
+        ),
+      ],
+    },
   ],
 });

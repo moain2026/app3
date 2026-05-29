@@ -104,30 +104,37 @@ export const CurrencyDtoSchema = z.object({
 export type CurrencyDto = z.infer<typeof CurrencyDtoSchema>;
 
 // ─── Bond / Bond payment ──────────────────────────────────────────────────
+// ⭐ Field names taken VERBATIM from entities/ItemBonds.java (v28) — ISS-12.
 export const BondDtoSchema = z.object({
-  id: zIntLoose,
-  bond_no: zIntLoose,
-  bond_type: zStringOrEmpty.default(''),
-  account_id: zIntLoose.optional(),
-  account_name: zStringOrEmpty.optional(),
-  currency_id: zIntLoose.optional(),
-  amount: zNumberLoose.default(0),
-  amount_paid: zNumberLoose.default(0),
+  num: zIntLoose, // bond record id
+  num_s: zIntLoose.default(0), // box/cashier number
+  nmstnd: zStringOrEmpty.optional(), // document/bond number (string!)
+  name: zStringOrEmpty.default(''), // account name
+  name_s: zStringOrEmpty.optional(), // box/cashier name
+  type: zIntLoose.default(0), // bond type (1=receipt)
+  cas: zIntLoose.default(0), // posting status
+  mdate: zStringOrEmpty.optional(), // bond date (string)
+  dain: zNumberLoose.default(0), // debit
+  mden: zNumberLoose.default(0), // credit
+  equal: zNumberLoose.default(0), // equivalent amount
+  balance: zNumberLoose.default(0), // running balance (rsed)
+  price_trans: zNumberLoose.default(0),
+  currencyid: zIntLoose.default(0),
+  currencyname: zStringOrEmpty.optional(),
+  branchid: zStringOrEmpty.optional(),
+  userid: zStringOrEmpty.optional(),
   notes: zStringOrEmpty.optional(),
-  bond_date: zStringOrEmpty.optional(), // legacy uses string; mapper parses
+  notes_box: zStringOrEmpty.optional(),
+  notes2: zStringOrEmpty.optional(), // bin
+  nref: zStringOrEmpty.optional(),
+  nref_docno: zStringOrEmpty.optional(),
+  finalbalance: zNumberLoose.default(0),
 });
 export type BondDto = z.infer<typeof BondDtoSchema>;
 
-export const BondPaymentDtoSchema = z.object({
-  id: zIntLoose,
-  bond_id: zIntLoose,
-  bond_no: zIntLoose,
-  amount: zNumberLoose.default(0),
-  payment_method: zStringOrEmpty.optional(),
-  reference_no: zStringOrEmpty.optional(),
-  notes: zStringOrEmpty.optional(),
-  payment_date: zStringOrEmpty.optional(),
-});
+// Bond payment shares the ItemBonds wire shape (GetListBondsPayment →
+// BondsPaymentResponse); `type` distinguishes payment from receipt.
+export const BondPaymentDtoSchema = BondDtoSchema;
 export type BondPaymentDto = z.infer<typeof BondPaymentDtoSchema>;
 
 // ─── List response wrappers ───────────────────────────────────────────────

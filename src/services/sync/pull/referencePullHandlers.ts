@@ -283,19 +283,47 @@ export const bondPullHandler: PullHandler = {
 
     const collection = database.collections.get<Bond>('bonds');
     const existing = await collection.query().fetch();
-    const byRemoteId = new Map<number, Bond>();
+    // Match on legacy `num` (the bond record id).
+    const byNum = new Map<number, Bond>();
     for (const b of existing) {
-      if (b.remoteId != null) {
-        byRemoteId.set(b.remoteId, b);
+      if (b.num != null) {
+        byNum.set(b.num, b);
       }
     }
 
     let upserted = 0;
     let skipped = 0;
 
+    // Write legacy ItemBonds columns directly (model getters are read-only).
+    const applyBondFields = (row: Bond, dto: (typeof bonds)[number]): void => {
+      row.num = dto.num;
+      row.numS = dto.numS;
+      row.nmstnd = dto.nmstnd;
+      row.name = dto.name;
+      row.nameS = dto.nameS;
+      row.type = dto.type;
+      row.cas = dto.cas;
+      row.mdate = dto.mdate;
+      row.dain = dto.dain;
+      row.mden = dto.mden;
+      row.equal = dto.equal;
+      row.balance = dto.balance;
+      row.priceTrans = dto.priceTrans;
+      row.currencyid = dto.currencyid;
+      row.currencyname = dto.currencyname;
+      row.branchid = dto.branchid;
+      row.userid = dto.userid;
+      row.notes = dto.notes;
+      row.notesBox = dto.notesBox;
+      row.notes2 = dto.notes2;
+      row.nref = dto.nref;
+      row.nrefDocNo = dto.nrefDocNo;
+      row.finalbalance = dto.finalbalance;
+    };
+
     await database.write(async () => {
       for (const dto of bonds) {
-        const local = byRemoteId.get(dto.remoteId);
+        const local = byNum.get(dto.num);
         if (local) {
           // LWW: skip if collector is mid-edit.
           if (
@@ -307,36 +335,16 @@ export const bondPullHandler: PullHandler = {
             continue;
           }
           await local.update(row => {
-            row.bondNo = dto.bondNo;
-            row.bondType = dto.bondType;
-            row.accountId = dto.accountId;
-            row.accountName = dto.accountName;
-            row.currencyId = dto.currencyId;
-            row.amount = dto.amount;
-            row.amountPaid = dto.amountPaid;
-            row.notes = dto.notes;
-            if (dto.bondDate) {
-              row.bondDate = dto.bondDate;
-            }
+            applyBondFields(row, dto);
             row.pushStatus = 'pristine';
             row.syncAttempts = 0;
             row.lastError = null;
-            row.remoteId = dto.remoteId;
           });
           upserted += 1;
         } else {
           await collection.create(row => {
             row.localUuid = uuidv4();
-            row.remoteId = dto.remoteId;
-            row.bondNo = dto.bondNo;
-            row.bondType = dto.bondType;
-            row.accountId = dto.accountId;
-            row.accountName = dto.accountName;
-            row.currencyId = dto.currencyId;
-            row.amount = dto.amount;
-            row.amountPaid = dto.amountPaid;
-            row.notes = dto.notes;
-            row.bondDate = dto.bondDate ?? new Date();
+            applyBondFields(row, dto);
             row.pushStatus = 'pristine';
             row.syncAttempts = 0;
             row.lastError = null;
@@ -373,9 +381,38 @@ export const bondPaymentPullHandler: PullHandler = {
     let upserted = 0;
     let skipped = 0;
 
+    // BondsPayment shares the ItemBonds wire shape. Map the legacy fields
+    // onto the (still wave-α) bond_payments columns:
+    //   num    → remote_id
+    //   nmstnd → bond_no (parse string → number; fall back to num)
+    //   equal/dain/mden → amount (dominant non-zero magnitude)
+    //   mdate  → payment_date
+    //   notes  → notes
+    // NOTE: bond_payments table itself is aligned in Wave 3; this mapping
+    // keeps the read path working today.
+    const bondNoOf = (dto: (typeof payments)[number]): number => {
+      if (dto.nmstnd && dto.nmstnd !== '') {
+        const n = Number(dto.nmstnd);
+        if (Number.isFinite(n)) return n;
+      }
+      return dto.num;
+    };
+    const amountOf = (dto: (typeof payments)[number]): number => {
+      if (dto.equal && dto.equal !== 0) return Math.abs(dto.equal);
+      return Math.abs(dto.dain || dto.mden || 0);
+    };
+    const dateOf = (dto: (typeof payments)[number]): Date | null => {
+      if (!dto.mdate) return null;
+      const normalized = dto.mdate.includes('T')
+        ? dto.mdate
+        : dto.mdate.replace(' ', 'T');
+      const d = new Date(normalized);
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+
     await database.write(async () => {
       for (const dto of payments) {
-        const local = byRemoteId.get(dto.remoteId);
+        const local = byRemoteId.get(dto.num);
         if (local) {
           if (
             local.pushStatus === 'dirty' ||
@@ -386,35 +423,36 @@ export const bondPaymentPullHandler: PullHandler = {
             continue;
           }
           await local.update(row => {
-            row.bondNo = dto.bondNo;
-            row.amount = dto.amount;
-            row.paymentMethod = dto.paymentMethod;
-            row.referenceNo = dto.referenceNo;
+            row.bondNo = bondNoOf(dto);
+            row.amount = amountOf(dto);
+            row.paymentMethod = null;
+            row.referenceNo = dto.nrefDocNo;
             row.notes = dto.notes;
-            if (dto.paymentDate) {
-              row.paymentDate = dto.paymentDate;
+            const d = dateOf(dto);
+            if (d) {
+              row.paymentDate = d;
             }
             row.pushStatus = 'pristine';
             row.syncAttempts = 0;
             row.lastError = null;
-            row.remoteId = dto.remoteId;
+            row.remoteId = dto.num;
           });
           upserted += 1;
         } else {
           await collection.create(row => {
             row.localUuid = uuidv4();
-            row.remoteId = dto.remoteId;
+            row.remoteId = dto.num;
             // bondId locally is the WatermelonDB id of the parent bond.
             // We don't have it from the wire payload; Phase 8 will run a
             // post-processor that joins on bond_no to fill it. For now we
             // store an empty placeholder.
             row.bondId = '';
-            row.bondNo = dto.bondNo;
-            row.amount = dto.amount;
-            row.paymentMethod = dto.paymentMethod;
-            row.referenceNo = dto.referenceNo;
+            row.bondNo = bondNoOf(dto);
+            row.amount = amountOf(dto);
+            row.paymentMethod = null;
+            row.referenceNo = dto.nrefDocNo;
             row.notes = dto.notes;
-            row.paymentDate = dto.paymentDate ?? new Date();
+            row.paymentDate = dateOf(dto) ?? new Date();
             row.pushStatus = 'pristine';
             row.syncAttempts = 0;
             row.lastError = null;

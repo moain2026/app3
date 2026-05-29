@@ -66,34 +66,35 @@ function escapeForLike(value: string): string {
 function buildQuery(filters: BondsQueryFilters) {
   const conditions: Q.Clause[] = [];
 
-  // Free-text search — bonds_no is numeric so we search via the
-  // string-cast account_name + bond_no LIKE pattern.
+  // Free-text search — `nmstnd` (bond number) is a string in the legacy
+  // model; we search the textual `name` (account name) + `notes` columns
+  // and leave numeric bond-number filtering to the JS post-pass below.
   const trimmed = filters.searchQuery.trim();
   if (trimmed.length > 0) {
     const pattern = `%${escapeForLike(trimmed)}%`;
-    // bond_no is stored as a number column; Q.like won't work on it
-    // directly. We instead match account_name OR notes textually and
-    // leave numeric bond_no filtering to a post-query JS pass via
-    // `applyTextFilter` (kept consistent with how readings does the
-    // over-consumption JS post-filter).
     conditions.push(
       Q.or(
-        Q.where('account_name', Q.like(pattern)),
+        Q.where('name', Q.like(pattern)),
+        Q.where('nmstnd', Q.like(pattern)),
         Q.where('notes', Q.like(pattern)),
       ),
     );
   }
 
-  if (filters.type !== 'all') {
-    conditions.push(Q.where('bond_type', filters.type));
+  // Legacy `type` is an int: 1 = receipt (قبض), otherwise payment (دفع).
+  if (filters.type === 'receipt') {
+    conditions.push(Q.where('type', 1));
+  } else if (filters.type === 'payment') {
+    conditions.push(Q.where('type', Q.notEq(1)));
   }
 
   return database.collections
     .get<Bond>('bonds')
     .query(
       ...conditions,
-      Q.sortBy('bond_date', Q.desc),
-      Q.sortBy('bond_no', Q.desc),
+      // Legacy bonds carry `mdate` (string) + `num` (record id). Order by
+      // the record id descending to mirror the legacy "newest first".
+      Q.sortBy('num', Q.desc),
     );
 }
 
@@ -182,8 +183,8 @@ export async function getBondStats(): Promise<BondsStats> {
   const collection = database.collections.get<Bond>('bonds');
   const [total, receipt, payment, synced, dirty, failed] = await Promise.all([
     collection.query().fetchCount(),
-    collection.query(Q.where('bond_type', 'receipt')).fetchCount(),
-    collection.query(Q.where('bond_type', 'payment')).fetchCount(),
+    collection.query(Q.where('type', 1)).fetchCount(),
+    collection.query(Q.where('type', Q.notEq(1))).fetchCount(),
     collection.query(Q.where('sync_status', 'synced')).fetchCount(),
     collection.query(Q.where('sync_status', 'dirty')).fetchCount(),
     collection.query(Q.where('sync_status', 'failed')).fetchCount(),
@@ -201,7 +202,7 @@ export function observeBondStats(): Observable<BondsStats> {
   return database.collections
     .get<Bond>('bonds')
     .query()
-    .observeWithColumns(['bond_type', 'sync_status'])
+    .observeWithColumns(['type', 'sync_status'])
     .pipe(
       map((rows: Bond[]): BondsStats => {
         const stats: BondsStats = {

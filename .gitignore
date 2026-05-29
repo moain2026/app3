@@ -1,48 +1,55 @@
-# ── Node / RN ──────────────────────────────────────────────
+# Node
 node_modules/
-npm-debug.log*
-yarn-error.log*
-.pnp.*
+npm-debug.log
+yarn-error.log
+package-lock.json
 
-# ── Build outputs ──────────────────────────────────────────
-android/app/build/
-android/build/
-android/.gradle/
-ios/build/
-ios/Pods/
-*.apk
-*.aab
-*.ipa
-
-# ── Expo / EAS ─────────────────────────────────────────────
+# React Native
 .expo/
-dist/
-web-build/
+.expo-shared/
 
-# ── Metro / RN caches ──────────────────────────────────────
-.metro-health-check*
-*.tsbuildinfo
-
-# ── Env & secrets ──────────────────────────────────────────
-.env
-.env.*
-!.env.example
+# Android
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
 *.keystore
 !debug.keystore
-google-services.json
+android/captures/
 
-# ── OS / IDE ───────────────────────────────────────────────
-.DS_Store
-Thumbs.db
+# iOS (not used, but just in case)
+ios/
+
+# Metro
+.metro-health-check*
+
+# Build artifacts
+build/
+dist/
+
+# IDE
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 *.swp
 
-# ── Logs ───────────────────────────────────────────────────
-*.log
-supervisord.log
-supervisord.pid
-supervisor.sock
+# OS
+.DS_Store
+Thumbs.db
 
-# ── Analysis: keep reports, ignore the large original APK ──
-analysis/**/*.apk
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/
+
+# Husky
+.husky/_/
+prepared-assets/

@@ -1,0 +1,697 @@
+{
+  "common": {
+    "appName": "العباسي تحصيل",
+    "loading": "جاري التحميل...",
+    "error": "حدث خطأ",
+    "retry": "إعادة المحاولة",
+    "cancel": "إلغاء",
+    "confirm": "تأكيد",
+    "save": "حفظ",
+    "next": "التالي",
+    "back": "رجوع",
+    "ok": "موافق",
+    "copy": "نسخ",
+    "copied": "تم النسخ",
+    "show": "إظهار",
+    "hide": "إخفاء",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "add": "إضافة",
+    "search": "بحث",
+    "close": "إغلاق",
+    "yes": "نعم",
+    "no": "لا",
+    "noResults": "لا توجد نتائج",
+    "devModeBanner": "⚠️ وضع التطوير — بيانات تجريبية"
+  },
+  "auth": {
+    "license": {
+      "title": "تفعيل الترخيص",
+      "subtitle": "أدخل مفتاح الترخيص لتفعيل التطبيق على هذا الجهاز",
+      "deviceId": "معرف الجهاز",
+      "deviceIdHint": "أرسل هذا المعرف إلى المسؤول للحصول على مفتاح الترخيص",
+      "copyDeviceId": "نسخ",
+      "licenseKey": "مفتاح الترخيص",
+      "licenseKeyPlaceholder": "أدخل المفتاح هنا",
+      "activate": "تفعيل",
+      "activating": "جاري التفعيل...",
+      "invalidKey": "مفتاح الترخيص غير صحيح",
+      "saveFailed": "فشل حفظ الترخيص. حاول مرة أخرى.",
+      "success": "تم تفعيل الترخيص بنجاح"
+    },
+    "login": {
+      "title": "تسجيل الدخول",
+      "subtitle": "أدخل بياناتك للمتابعة",
+      "username": "اسم المستخدم",
+      "usernamePlaceholder": "أدخل اسم المستخدم",
+      "password": "كلمة المرور",
+      "passwordPlaceholder": "أدخل كلمة المرور",
+      "submit": "تسجيل الدخول",
+      "submitting": "جاري تسجيل الدخول...",
+      "forgotPassword": "نسيت كلمة المرور؟",
+      "invalidCredentials": "بيانات الدخول غير صحيحة",
+      "networkError": "تعذر الاتصال بالخادم. تحقق من الشبكة.",
+      "usernameRequired": "اسم المستخدم مطلوب",
+      "passwordRequired": "كلمة المرور مطلوبة",
+      "passwordTooShort": "كلمة المرور قصيرة جداً",
+      "testConnection": "اختبار الاتصال",
+      "testTesting": "جاري الاختبار...",
+      "testReachable": "تم الوصول إلى الخادم",
+      "testFailed": "تعذر الوصول إلى الخادم",
+      "copyError": "📋 نسخ تفاصيل الخطأ",
+      "errorCopied": "تم نسخ تفاصيل الخطأ",
+      "secureIdInUse": "الرقم التسلسلي المستخدم: {{value}}",
+      "devMode": {
+        "title": "🔧 وضع التطوير (للاختبار فقط)",
+        "description": "للدخول بدون اتصال بالخادم، استخدم بيانات الدخول التالية:",
+        "credentials": "اسم المستخدم: dev\nكلمة المرور: 0000",
+        "quickLogin": "🚀 دخول سريع (Dev Mode)"
+      }
+    },
+    "pin": {
+      "title": "أنشئ رمز PIN",
+      "subtitle": "لحماية حسابك",
+      "enterPin": "أدخل رمز PIN",
+      "confirmPin": "أعد إدخال PIN",
+      "save": "حفظ",
+      "saving": "جاري الحفظ...",
+      "mismatch": "الـ PIN غير متطابق",
+      "tooShort": "PIN يجب أن يكون 4 أرقام",
+      "saveFailed": "فشل حفظ الـ PIN"
+    },
+    "splash": {
+      "loading": "جاري التحميل..."
+    }
+  },
+  "validation": {
+    "required": "هذا الحقل مطلوب",
+    "minLength": "يجب أن لا يقل عن {{count}} حرف",
+    "maxLength": "يجب أن لا يزيد عن {{count}} حرف",
+    "email": "بريد إلكتروني غير صحيح"
+  },
+  "settings": {
+    "server": {
+      "title": "إعدادات الاتصال",
+      "serverAddress": "عنوان السيرفر",
+      "serverAddressPlaceholder": "100.87.131.115",
+      "port": "البورت",
+      "portPlaceholder": "3000",
+      "branch": "رقم الفرع",
+      "branchPlaceholder": "1",
+      "secureIdLabel": "الرقم التسلسلي للجهاز (legacy)",
+      "secureIdPlaceholder": "اتركه فارغاً للتلقائي",
+      "secureIdHint": "إذا كنت تنتقل من النظام القديم، أدخل القيمة المعروضة في إعداداته (مثل 2098897319) حتى يطابقها الخادم.",
+      "secureIdAuto": "الافتراضي التلقائي: {{value}}",
+      "secureIdInvalid": "يجب أن يكون بطول 8-32 حرفاً (أرقام/حروف/_-)",
+      "serialNumber": "معرّف الجهاز (Device ID)",
+      "useHttps": "استخدام HTTPS",
+      "save": "حفظ",
+      "cancel": "تراجع",
+      "saved": "تم الحفظ بنجاح",
+      "invalidIp": "عنوان IP غير صحيح",
+      "invalidPort": "البورت يجب أن يكون بين 1 و 65535",
+      "invalidBranch": "رقم الفرع يجب أن يكون رقماً موجباً"
+    }
+  },
+  "navigation": {
+    "tabs": {
+      "home": "الرئيسية",
+      "readings": "القراءات",
+      "bonds": "السندات",
+      "reports": "التقارير"
+    },
+    "drawer": {
+      "profile": "الملف الشخصي",
+      "serverSettings": "إعدادات الاتصال",
+      "printerSettings": "إعدادات الطابعة",
+      "companyInfo": "بيانات الشركة",
+      "scanner": "مسح الباركود",
+      "settings": "الإعدادات",
+      "about": "حول التطبيق",
+      "logout": "تسجيل الخروج",
+      "logoutConfirm": "هل أنت متأكد من تسجيل الخروج؟",
+      "logoutYes": "تسجيل خروج",
+      "logoutNo": "إلغاء",
+      "version": "الإصدار {{version}}"
+    }
+  },
+  "printer": {
+    "settings": {
+      "title": "إعدادات الطابعة",
+      "subtitle": "Datecs DPP-250 — اتصال Bluetooth",
+      "currentPrinter": "الطابعة الحالية",
+      "noPrinterConnected": "لا توجد طابعة متصلة",
+      "lastConnected": "آخر اتصال",
+      "neverConnected": "لم يسبق الاتصال"
+    },
+    "scan": {
+      "button": "بحث عن طابعات",
+      "scanning": "جارٍ البحث…",
+      "bondedDevicesTitle": "الأجهزة المقترنة",
+      "discoveredDevicesTitle": "الأجهزة المكتشفة",
+      "empty": "لم يتم العثور على طابعات. تأكد من تشغيل الطابعة وإقرانها مع الهاتف من إعدادات Bluetooth.",
+      "stop": "إيقاف البحث"
+    },
+    "connect": {
+      "button": "اتصال",
+      "connecting": "جارٍ الاتصال بـ {{name}}…",
+      "connected": "تم الاتصال بـ {{name}}",
+      "disconnect": "قطع الاتصال",
+      "reconnect": "إعادة الاتصال",
+      "failed": "فشل الاتصال",
+      "failedReason": "{{reason}} — جرّب إعادة الإقران من إعدادات Bluetooth",
+      "timeout": "انتهت مهلة الاتصال"
+    },
+    "testPrint": {
+      "button": "اختبار طباعة",
+      "running": "جارٍ إرسال صفحة الاختبار…",
+      "success": "تم إرسال صفحة الاختبار بنجاح",
+      "failed": "تعذّر طباعة صفحة الاختبار"
+    },
+    "status": {
+      "battery": "البطارية",
+      "batteryLow": "بطارية منخفضة",
+      "batteryOk": "البطارية ممتلئة",
+      "paper": "الورق",
+      "paperOk": "ورق جاهز",
+      "paperOut": "نفد الورق",
+      "coverOpen": "غطاء الطابعة مفتوح",
+      "ready": "جاهزة",
+      "busy": "مشغولة"
+    },
+    "error": {
+      "notConnected": "الطابعة غير متصلة — اربط جهازاً أولاً",
+      "noDeviceSelected": "اختر جهازاً أولاً",
+      "connectFailed": "فشل الاتصال",
+      "bluetoothOff": "Bluetooth مغلق — يرجى تفعيله",
+      "bluetoothDisabled": "Bluetooth غير مفعّل",
+      "permissionDenied": "صلاحية Bluetooth مرفوضة",
+      "deviceNotFound": "الجهاز غير موجود",
+      "writeFailed": "تعذّر إرسال البيانات إلى الطابعة",
+      "brokenPipe": "انقطع الاتصال بالطابعة — جرّب الاتصال من جديد",
+      "encodingFailed": "تعذّر تحويل النص إلى cp1256",
+      "unknown": "خطأ غير معروف"
+    },
+    "permission": {
+      "explanationTitle": "نحتاج إذن Bluetooth",
+      "explanationBody": "للاتصال بالطابعة المحمولة وطباعة إيصالات السندات والقراءات، يحتاج التطبيق إلى صلاحية Bluetooth. لن نستخدمها لتحديد موقعك.",
+      "grant": "السماح",
+      "deny": "لاحقاً"
+    },
+    "print": "🖨️ طباعة",
+    "printing": "جارٍ الطباعة…",
+    "lastPrintAt": "آخر طباعة: {{time}}",
+    "openSettings": "افتح إعدادات الطابعة"
+  },
+  "scanner": {
+    "title": "مسح رقم العداد",
+    "instruction": "وجّه الكاميرا نحو ملصق رقم العداد",
+    "scanning": "جارٍ المسح…",
+    "noCamera": "لا تتوفر كاميرا",
+    "permissionRequired": "صلاحية الكاميرا مطلوبة",
+    "permissionExplanation": "نستخدم الكاميرا فقط لقراءة باركود رقم العداد لتقليل الأخطاء اليدوية.",
+    "manualEntry": "إدخال يدوي بدلاً من المسح",
+    "tryAgain": "إعادة المحاولة",
+    "lastScanned": "آخر رقم تم مسحه",
+    "torch": "الإضاءة"
+  },
+  "company": {
+    "title": "بيانات الشركة",
+    "subtitle": "تظهر على رأس كل إيصال مطبوع",
+    "name": "شركة العباسي لتوليد الكهرباء التجارية",
+    "shortName": "العباسي تحصيل",
+    "branch": "الفرع رقم {{number}}",
+    "supportPhone": "هاتف الدعم",
+    "fields": {
+      "nameAr": "اسم الشركة (عربي)",
+      "nameEn": "اسم الشركة (إنجليزي)",
+      "phone": "رقم الهاتف",
+      "address": "العنوان",
+      "footerText": "نص ذيل الإيصال",
+      "logoUrl": "رابط الشعار (اختياري)"
+    },
+    "saved": "تم حفظ بيانات الشركة",
+    "save": "حفظ",
+    "cancel": "تراجع"
+  },
+  "home": {
+    "welcome": "مرحباً، {{name}}",
+    "branch": "الفرع رقم {{branch}}",
+    "kpi": {
+      "todayReadings": "قراءات اليوم",
+      "todayBonds": "سندات اليوم",
+      "pending": "في الانتظار",
+      "lastSync": "آخر مزامنة",
+      "neverSynced": "لم تتم",
+      "now": "الآن",
+      "minutesAgo": "منذ {{count}} دقيقة",
+      "hoursAgo": "منذ {{count}} ساعة",
+      "daysAgo": "منذ {{count}} يوم"
+    },
+    "startTour": "ابدأ جولة قراءات",
+    "recentActivity": "آخر العمليات",
+    "noActivity": "لا توجد عمليات حديثة",
+    "pullToRefresh": "اسحب للتحديث"
+  },
+  "sync": {
+    "status": {
+      "online": "متصل",
+      "syncing": "جاري المزامنة",
+      "error": "خطأ في المزامنة",
+      "offline": "غير متصل"
+    },
+    "actions": {
+      "syncNow": "مزامنة الآن",
+      "viewDetails": "عرض التفاصيل",
+      "close": "إغلاق"
+    },
+    "info": {
+      "title": "حالة المزامنة",
+      "pendingCount": "{{count}} عملية معلّقة",
+      "failedCount": "{{count}} عملية فاشلة",
+      "lastSync": "آخر مزامنة: {{time}}",
+      "noPending": "لا توجد عمليات معلّقة",
+      "noFailed": "لا توجد عمليات فاشلة",
+      "neverSynced": "لم تتم المزامنة بعد"
+    }
+  },
+  "comingSoon": {
+    "readings": "قائمة القراءات\n(الموجة 4)",
+    "bonds": "السندات والمدفوعات\n(الموجة 6)",
+    "reports": "التقارير\n(الموجة 7)",
+    "profile": "الملف الشخصي\n(الموجة 7)",
+    "settings": "الإعدادات العامة\n(الموجة 7)",
+    "about": "حول التطبيق\n(الموجة 7)"
+  },
+  "readings": {
+    "list": {
+      "title": "القراءات",
+      "searchPlaceholder": "بحث برقم العداد أو الاسم...",
+      "filters": {
+        "area": "المنطقة",
+        "book": "الدفتر",
+        "group": "المجموعة",
+        "status": "الحالة",
+        "all": "الكل",
+        "pending": "معلّقة",
+        "posted": "مرحّلة",
+        "over": "استهلاك زائد",
+        "reset": "تصفية"
+      },
+      "empty": {
+        "title": "لا توجد قراءات",
+        "subtitle": "اسحب لأسفل للمزامنة، أو استخدم زر المزامنة بالأعلى.",
+        "action": "مزامنة الآن"
+      },
+      "stats": {
+        "total": "الإجمالي: {{count}}",
+        "posted": "مرحّلة: {{count}}",
+        "pending": "معلّقة: {{count}}",
+        "over": "زائدة: {{count}}"
+      },
+      "sync": {
+        "success": "تمت المزامنة",
+        "error": "فشلت المزامنة",
+        "running": "جاري المزامنة...",
+        "devSkip": "المزامنة معطّلة في وضع التطوير"
+      },
+      "badges": {
+        "posted": "مرحّلة",
+        "dirty": "لم تُرفع",
+        "failed": "فشل الرفع"
+      },
+      "unread": "—"
+    },
+    "detail": {
+      "title": "تفاصيل القراءة",
+      "section": {
+        "subscriber": "بيانات المشترك",
+        "readings": "القراءات",
+        "sync": "حالة المزامنة"
+      },
+      "field": {
+        "meterNumber": "رقم العداد",
+        "name": "الاسم",
+        "alias": "الاسم البديل",
+        "area": "المنطقة",
+        "book": "الدفتر",
+        "group": "المجموعة",
+        "type": "النوع",
+        "previous": "القراءة السابقة",
+        "current": "القراءة الحالية",
+        "consumption": "الاستهلاك",
+        "expected": "الاستهلاك المتوقع",
+        "currentPlaceholder": "أدخل القراءة الحالية"
+      },
+      "alert": {
+        "overConsumption": "⚠ استهلاك يتجاوز المتوقع",
+        "veryHighTitle": "استهلاك مرتفع جداً",
+        "veryHighBody": "الاستهلاك المُدخل ({{consumption}}) يتجاوز خمسة أضعاف المتوقع ({{expected}}). هل أنت متأكد من القيمة؟"
+      },
+      "validation": {
+        "required": "الرجاء إدخال القراءة الحالية",
+        "notNumber": "القراءة يجب أن تكون رقماً صحيحاً",
+        "tooLow": "القراءة الجديدة يجب أن تكون أكبر من السابقة ({{previous}})",
+        "tooHigh": "القراءة كبيرة جداً، تحقق منها",
+        "locked": "لا يمكن تعديل القراءة المرحّلة"
+      },
+      "action": {
+        "save": "حفظ",
+        "confirm": "تأكيد",
+        "cancel": "إلغاء",
+        "retry": "إعادة المحاولة"
+      },
+      "saved": "تم حفظ القراءة",
+      "syncState": {
+        "pristine": "محفوظة على الخادم",
+        "dirty": "بانتظار الرفع",
+        "syncing": "جاري الرفع...",
+        "synced": "تم الرفع بنجاح",
+        "failed": "فشل الرفع",
+        "lastAttempt": "آخر محاولة: {{time}}",
+        "lastError": "آخر خطأ: {{message}}",
+        "never": "لم يتم الرفع بعد"
+      }
+    },
+    "history": {
+      "title": "سجلّ قراءات المشترك",
+      "notFoundTitle": "المشترك غير موجود",
+      "notFoundSubtitle": "تحقق من رقم العداد ثم حاول مرة أخرى.",
+      "place": "المنطقة",
+      "avg": "المتوسط",
+      "max": "الأعلى",
+      "min": "الأدنى",
+      "chartPlaceholder": "رسم الاستهلاك سيظهر هنا — المرحلة B",
+      "tableTitle": "آخر القراءات",
+      "col": {
+        "date": "التاريخ",
+        "previous": "السابقة",
+        "current": "الحالية",
+        "consumption": "الاستهلاك",
+        "avg": "المتوسط"
+      }
+    },
+    "bulk": {
+      "title": "إدخال قراءات بالجملة",
+      "section": "مشتركون في انتظار القراءة",
+      "placeFilter": "المنطقة",
+      "allPlaces": "كل المناطق",
+      "previous": "السابقة",
+      "placeholder": "القراءة",
+      "emptyTitle": "لا توجد قراءات معلّقة",
+      "emptySubtitle": "كل المشتركين في هذه المنطقة تم إدخال قراءاتهم.",
+      "draftCount": "{{count}} قراءة جديدة",
+      "saveAll": "حفظ الكل"
+    }
+  },
+  "bonds": {
+    "types": {
+      "receipt": "قبض",
+      "payment": "صرف"
+    },
+    "list": {
+      "title": "السندات",
+      "searchPlaceholder": "بحث برقم السند أو اسم المشترك...",
+      "filterAll": "الكل",
+      "accountNum": "حساب",
+      "partial": "دفعة جزئية",
+      "emptyTitle": "لا توجد سندات",
+      "emptySubtitle": "ابدأ بإنشاء سند قبض أو صرف جديد.",
+      "emptySearchTitle": "لا نتائج",
+      "emptySearchSubtitle": "جرّب بحثاً مختلفاً أو امسح الفلاتر.",
+      "createCta": "سند جديد"
+    },
+    "detail": {
+      "title": "تفاصيل السند",
+      "bondNo": "سند رقم #{{number}}",
+      "accountSection": "بيانات المشترك",
+      "accountName": "الاسم",
+      "accountNum": "رقم الحساب",
+      "amountSection": "المبلغ",
+      "amount": "إجمالي السند",
+      "amountPaid": "المدفوع",
+      "remaining": "المتبقي",
+      "notesSection": "ملاحظات",
+      "paymentsSection": "الدفعات",
+      "addPayment": "إضافة دفعة",
+      "paymentsEmpty": "لا توجد دفعات جزئية لهذا السند.",
+      "notFound": "السند غير موجود",
+      "print": "🖨️ طباعة",
+      "printSoon": "خاصية الطباعة قريباً (Wave 6-Β)",
+      "deleteConfirmTitle": "حذف السند؟",
+      "deleteConfirmMsg": "سيتم حذف السند #{{number}} نهائياً. لا يمكن التراجع."
+    },
+    "form": {
+      "createTitle": "سند جديد",
+      "editTitle": "تعديل سند",
+      "typeSection": "نوع السند",
+      "accountSection": "المشترك",
+      "accountLabel": "الحساب",
+      "accountPlaceholder": "اختر مشتركاً",
+      "currentBalance": "الرصيد الحالي",
+      "balanceDebtor": "مدين",
+      "balanceCreditor": "دائن",
+      "amountSection": "المبلغ",
+      "currencyLabel": "العملة",
+      "currencyPlaceholder": "اختر العملة",
+      "amountLabel": "القيمة",
+      "amountPlaceholder": "0",
+      "notesSection": "ملاحظات",
+      "notesLabel": "ملاحظات (اختياري)",
+      "notesPlaceholder": "اكتب أي ملاحظة هنا...",
+      "createCta": "حفظ السند",
+      "editCta": "حفظ التعديل",
+      "validationTitle": "بيانات ناقصة",
+      "validationMsg": "تأكد من اختيار المشترك والعملة وإدخال مبلغ صحيح.",
+      "savedTitle": "تم الحفظ",
+      "savedCreate": "تم إنشاء سند جديد (تجريبي).",
+      "savedEdit": "تم حفظ التعديلات (تجريبي)."
+    },
+    "payments": {
+      "formTitle": "إضافة دفعة جزئية",
+      "bondSummary": "ملخّص السند",
+      "amountSection": "قيمة الدفعة",
+      "amountLabel": "المبلغ",
+      "amountHint": "لا يتجاوز المتبقي ({{remaining}})",
+      "notesSection": "ملاحظات",
+      "notesLabel": "ملاحظات (اختياري)",
+      "notesPlaceholder": "مثال: دفعة نقدية من المحل",
+      "saveCta": "حفظ الدفعة",
+      "invalidTitle": "قيمة غير صحيحة",
+      "invalidMsg": "أدخل مبلغاً موجباً.",
+      "overTitle": "تجاوز المتبقي",
+      "overMsg": "المبلغ المُدخل أكبر من المتبقي على السند.",
+      "savedTitle": "تم الحفظ",
+      "savedMsg": "تم تسجيل الدفعة (تجريبي)."
+    }
+  },
+  "pickers": {
+    "account": {
+      "title": "اختر مشتركاً",
+      "subtitle": "ابحث بالاسم أو رقم الحساب",
+      "searchPlaceholder": "بحث...",
+      "emptyTitle": "لا توجد نتائج",
+      "emptySubtitle": "جرّب كلمات بحث مختلفة."
+    },
+    "place": {
+      "title": "اختر المنطقة",
+      "subtitle": "المناطق المتاحة",
+      "allOption": "كل المناطق",
+      "subscriberCount": "{{count}} مشترك"
+    },
+    "currency": {
+      "title": "اختر العملة",
+      "subtitle": "العملات المتاحة",
+      "base": "العملة الأساسية",
+      "rate": "1 = {{rate}}"
+    },
+    "period": {
+      "title": "اختر الفترة",
+      "presets": {
+        "today": "اليوم",
+        "yesterday": "أمس",
+        "thisWeek": "هذا الأسبوع",
+        "thisMonth": "هذا الشهر",
+        "last30Days": "آخر 30 يوماً",
+        "custom": "تاريخ مخصص"
+      }
+    }
+  },
+  "reports": {
+    "hub": {
+      "title": "التقارير",
+      "subtitle": "اختر تقريراً لعرضه أو طباعته."
+    },
+    "actions": {
+      "exportPdf": "تصدير PDF",
+      "print": "🖨️ طباعة"
+    },
+    "kpi": {
+      "accounts": "عدد الحسابات",
+      "totalBalance": "الإجمالي",
+      "currentBalance": "الرصيد الحالي",
+      "totalReceipts": "إجمالي القبض",
+      "totalPayments": "إجمالي الصرف",
+      "bondCount": "سند",
+      "netMovement": "صافي الحركة",
+      "daysCovered": "يوم",
+      "date": "التاريخ",
+      "totalExpenses": "إجمالي المصروفات",
+      "totalSubscribers": "إجمالي المشتركين",
+      "progress": "نسبة الإنجاز",
+      "totalConsumption": "إجمالي الاستهلاك",
+      "kwhUnit": "ك.و.س",
+      "pending": "المعلّقة"
+    },
+    "fields": {
+      "account": "الحساب"
+    },
+    "columns": {
+      "accountNum": "رقم الحساب",
+      "accountName": "الاسم",
+      "place": "المنطقة",
+      "balance": "الرصيد",
+      "date": "التاريخ",
+      "docNo": "رقم المستند",
+      "description": "البيان",
+      "debit": "مدين",
+      "credit": "دائن",
+      "bondNo": "رقم السند",
+      "type": "النوع",
+      "amount": "المبلغ",
+      "receipts": "القبض",
+      "payments": "الصرف",
+      "net": "الصافي",
+      "category": "البند",
+      "group": "المجموعة",
+      "total": "العدد",
+      "posted": "مرحّلة",
+      "pending": "معلّقة",
+      "consumption": "الاستهلاك"
+    },
+    "hints": {
+      "tapDate": "اضغط على التاريخ لعرض التفاصيل."
+    },
+    "entries": {
+      "BalanceHeaderReport": {
+        "title": "ميزان عام",
+        "subtitle": "الرصيد الحالي لكل المشتركين."
+      },
+      "BalanceDetailsReport": {
+        "title": "كشف حساب تفصيلي",
+        "subtitle": "حركات حساب مشترك واحد في فترة محددة."
+      },
+      "BondsHeaderReport": {
+        "title": "تقرير السندات",
+        "subtitle": "كل سندات القبض والصرف في الفترة."
+      },
+      "BoxMoveReport": {
+        "title": "حركة الصندوق",
+        "subtitle": "الإيرادات والمصروفات اليومية."
+      },
+      "BoxMoveDetailsReport": {
+        "title": "تفاصيل حركة الصندوق",
+        "subtitle": "تفاصيل كل سند في يوم محدد."
+      },
+      "ExpensesReport": {
+        "title": "المصروفات اليومية",
+        "subtitle": "بنود المصروفات حسب التاريخ."
+      },
+      "ReadingHeaderReport": {
+        "title": "تقرير الاستهلاك",
+        "subtitle": "ملخص قراءات كل منطقة ومجموعة."
+      }
+    }
+  },
+  "settings": {
+    "hub": {
+      "title": "الإعدادات",
+      "subtitle": "اضبط معلومات الشركة، الطابعة، الاتصال والصلاحيات.",
+      "sectionGeneral": "إعدادات عامة",
+      "version": "إصدار التطبيق: {{version}}"
+    },
+    "entries": {
+      "CompanyInfo": {
+        "title": "بيانات الشركة",
+        "subtitle": "ما يظهر في رأس الإيصال المطبوع."
+      },
+      "PrinterSettings": {
+        "title": "إعدادات الطابعة",
+        "subtitle": "اقتران الطابعة المحمولة واختبار الطباعة."
+      },
+      "ServerSettings": {
+        "title": "إعدادات الاتصال",
+        "subtitle": "عنوان الخادم والبورت والفرع."
+      },
+      "Permissions": {
+        "title": "صلاحيات التطبيق",
+        "subtitle": "إدارة صلاحيات الكاميرا والبلوتوث والموقع."
+      },
+      "About": {
+        "title": "حول التطبيق",
+        "subtitle": "الإصدار والترخيص والاعتمادات."
+      }
+    },
+    "permissions": {
+      "title": "الصلاحيات",
+      "subtitle": "إدارة الصلاحيات التي يستخدمها التطبيق.",
+      "runtimeSection": "صلاحيات النظام",
+      "request": "طلب الصلاحية",
+      "openSettings": "فتح إعدادات النظام",
+      "helpTitle": "متى أحتاج هذه الصلاحيات؟",
+      "helpBody": "الكاميرا لمسح أرقام العدّادات، البلوتوث للاتصال بالطابعة المحمولة، والموقع لتحديد منطقة الجباية. لا نشارك أي بيانات خارج التطبيق.",
+      "status": {
+        "granted": "ممنوحة",
+        "denied": "مرفوضة",
+        "blocked": "محجوبة"
+      },
+      "camera": {
+        "title": "الكاميرا",
+        "desc": "لمسح أرقام العدّادات والباركود."
+      },
+      "bluetooth": {
+        "title": "البلوتوث",
+        "desc": "للاتصال بالطابعة المحمولة Datecs DPP-250."
+      },
+      "location": {
+        "title": "الموقع",
+        "desc": "لاكتشاف الأجهزة عبر البلوتوث على بعض إصدارات أندرويد."
+      },
+      "storage": {
+        "title": "التخزين",
+        "desc": "لحفظ نسخ احتياطية وتقارير PDF."
+      },
+      "phone": {
+        "title": "الهاتف",
+        "desc": "لاتصال الدعم الفني عند الحاجة."
+      }
+    }
+  },
+  "about": {
+    "title": "حول التطبيق",
+    "tagline": "تطبيق تحصيل اشتراكات الكهرباء — شركة العباسي.",
+    "licenseSection": "الترخيص",
+    "appSection": "بيانات التطبيق",
+    "creditsSection": "مكتبات مُستخدمة",
+    "contactSection": "تواصل معنا",
+    "licensee": "المرخّص له",
+    "branch": "الفرع",
+    "deviceId": "معرف الجهاز",
+    "releaseDate": "تاريخ الإصدار",
+    "packageName": "اسم الحزمة",
+    "supportPhone": "+967 000 000 000",
+    "copyright": "© {{year}} العباسي لتوليد الكهرباء التجارية"
+  },
+  "profile": {
+    "title": "الملف الشخصي",
+    "accountSection": "بيانات الحساب",
+    "actionsSection": "إجراءات",
+    "username": "اسم المستخدم",
+    "branch": "الفرع",
+    "lastLogin": "آخر تسجيل دخول",
+    "changePassword": "تغيير كلمة المرور",
+    "changePin": "تغيير رمز PIN",
+    "logout": "تسجيل الخروج",
+    "actionsHint": "ستُفعّل هذه الإجراءات في المرحلة B."
+  }
+}

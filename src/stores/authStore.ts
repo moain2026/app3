@@ -431,28 +431,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (hydrated) {
           resolvedUser = { ...resolvedUser, ...hydrated };
         }
-        persistCollectorIdentity(resolvedUser);
 
-        set({
-          user: resolvedUser,
-          accessToken: access,
-          refreshToken: access,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-          lastLoginError: null,
-          isDevBypass: false,
-        });
-        log.info('STAGE 1 — /Authenticate success', {
-          username,
-          nou: resolvedUser.nou ?? 0,
-          sys: resolvedUser.sys ?? 0,
-        });
-        // Wave 7 P1: kick a non-blocking pull of reference + collector
-        // data so the user lands on a hot cache. Dev-bypass never gets
-        // here (handled in the bypass branch above).
-        fireAfterLoginSync();
-        return true;
+        // If /Authenticate gave a token but we could NOT resolve the
+        // collector's NOU (roster fetch failed, or this user is not in the
+        // roster), do NOT settle on a scope-less session — that's exactly
+        // the "connected but no data" trap. Fall through to STAGE 2 (/Login)
+        // whose Users payload carries NOU/NOA/SYS directly (the legacy app
+        // ONLY uses /Login). A SYS user is fine with nou=0 (sees all data).
+        const haveScope =
+          (resolvedUser.nou != null && resolvedUser.nou > 0) ||
+          resolvedUser.sys === 1;
+        if (!haveScope) {
+          stage1Diagnostic = `STAGE 1 — /Authenticate succeeded (token obtained) but could NOT resolve NOU from /GetListUsers for "${username}". Falling back to /Login to obtain the Users payload directly.`;
+          log.warn('STAGE 1 token OK but no NOU — falling through to /Login');
+        } else {
+          persistCollectorIdentity(resolvedUser);
+
+          set({
+            user: resolvedUser,
+            accessToken: access,
+            refreshToken: access,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+            lastLoginError: null,
+            isDevBypass: false,
+          });
+          log.info('STAGE 1 — /Authenticate success', {
+            username,
+            nou: resolvedUser.nou ?? 0,
+            sys: resolvedUser.sys ?? 0,
+          });
+          // Wave 7 P1: kick a non-blocking pull of reference + collector
+          // data so the user lands on a hot cache. Dev-bypass never gets
+          // here (handled in the bypass branch above).
+          fireAfterLoginSync();
+          return true;
+        }
       }
 
       // Schema parse failed OR token empty → record diagnostic and fall

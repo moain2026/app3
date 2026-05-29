@@ -39,7 +39,6 @@ import {
   observeAccountByCode,
   observeReadingsByAccount,
 } from '@/services/repository';
-import { observeReadingsByAccount } from '@/services/repository/readingsRepository';
 import { toMockAccount } from '@/services/repository/viewModels';
 
 export function ReadingsHistoryScreen(): React.JSX.Element {

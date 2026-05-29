@@ -35,7 +35,10 @@ import type { Account } from '@/database/models/Account';
 import type { Reading } from '@/database/models/Reading';
 import type { MockAccount } from '@/mocks/accounts';
 import type { MainStackParamList } from '@/navigation/types';
-import { observeAccountByCode } from '@/services/repository';
+import {
+  observeAccountByCode,
+  observeReadingsByAccount,
+} from '@/services/repository';
 import { observeReadingsByAccount } from '@/services/repository/readingsRepository';
 import { toMockAccount } from '@/services/repository/viewModels';
 

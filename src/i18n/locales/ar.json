@@ -89,30 +89,6 @@
     "maxLength": "يجب أن لا يزيد عن {{count}} حرف",
     "email": "بريد إلكتروني غير صحيح"
   },
-  "settings": {
-    "server": {
-      "title": "إعدادات الاتصال",
-      "serverAddress": "عنوان السيرفر",
-      "serverAddressPlaceholder": "100.87.131.115",
-      "port": "البورت",
-      "portPlaceholder": "3000",
-      "branch": "رقم الفرع",
-      "branchPlaceholder": "1",
-      "secureIdLabel": "الرقم التسلسلي للجهاز (legacy)",
-      "secureIdPlaceholder": "اتركه فارغاً للتلقائي",
-      "secureIdHint": "إذا كنت تنتقل من النظام القديم، أدخل القيمة المعروضة في إعداداته (مثل 2098897319) حتى يطابقها الخادم.",
-      "secureIdAuto": "الافتراضي التلقائي: {{value}}",
-      "secureIdInvalid": "يجب أن يكون بطول 8-32 حرفاً (أرقام/حروف/_-)",
-      "serialNumber": "معرّف الجهاز (Device ID)",
-      "useHttps": "استخدام HTTPS",
-      "save": "حفظ",
-      "cancel": "تراجع",
-      "saved": "تم الحفظ بنجاح",
-      "invalidIp": "عنوان IP غير صحيح",
-      "invalidPort": "البورت يجب أن يكون بين 1 و 65535",
-      "invalidBranch": "رقم الفرع يجب أن يكون رقماً موجباً"
-    }
-  },
   "navigation": {
     "tabs": {
       "home": "الرئيسية",
@@ -604,6 +580,28 @@
     }
   },
   "settings": {
+    "server": {
+      "title": "إعدادات الاتصال",
+      "serverAddress": "عنوان السيرفر",
+      "serverAddressPlaceholder": "100.87.131.115",
+      "port": "البورت",
+      "portPlaceholder": "3000",
+      "branch": "رقم الفرع",
+      "branchPlaceholder": "1",
+      "secureIdLabel": "الرقم التسلسلي للجهاز (legacy)",
+      "secureIdPlaceholder": "اتركه فارغاً للتلقائي",
+      "secureIdHint": "إذا كنت تنتقل من النظام القديم، أدخل القيمة المعروضة في إعداداته (مثل 2098897319) حتى يطابقها الخادم.",
+      "secureIdAuto": "الافتراضي التلقائي: {{value}}",
+      "secureIdInvalid": "يجب أن يكون بطول 8-32 حرفاً (أرقام/حروف/_-)",
+      "serialNumber": "معرّف الجهاز (Device ID)",
+      "useHttps": "استخدام HTTPS",
+      "save": "حفظ",
+      "cancel": "تراجع",
+      "saved": "تم الحفظ بنجاح",
+      "invalidIp": "عنوان IP غير صحيح",
+      "invalidPort": "البورت يجب أن يكون بين 1 و 65535",
+      "invalidBranch": "رقم الفرع يجب أن يكون رقماً موجباً"
+    },
     "hub": {
       "title": "الإعدادات",
       "subtitle": "اضبط معلومات الشركة، الطابعة، الاتصال والصلاحيات.",

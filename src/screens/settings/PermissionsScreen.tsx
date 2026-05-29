@@ -6,29 +6,35 @@
  * inspect at-a-glance why a feature isn't working (e.g. Bluetooth
  * disabled blocks printer pairing).
  *
- * Wave 6-Α — UI skeleton (mock grant states + no system bridge yet).
- *
- * TODO Wave 6-Β:
- *   • Replace mock state with PermissionsAndroid.check() / Linking.openSettings().
- *   • Subscribe to AppState foreground events to refresh after the user
- *     returns from system settings.
- *   • Pull the actual SDK level via DeviceInfo to surface only relevant items.
- *   • Add a "request all" CTA that batches request() calls.
+ * Wired to the real Android runtime-permission bridge:
+ *   • `PermissionsAndroid.check()` reads the current grant state on mount.
+ *   • `PermissionsAndroid.request()` prompts the user; if the result is
+ *     `never_ask_again` we flip the row to "blocked".
+ *   • `Linking.openSettings()` deep-links to the app's system settings page
+ *     for blocked permissions.
+ *   • An AppState foreground listener re-checks after the user returns from
+ *     system settings, so the UI reflects changes made there.
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  AppState,
+  type AppStateStatus,
+  Linking,
+  Permission,
+  PermissionsAndroid,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from 'react-native-vector-icons/Feather';
 
 import { AppHeader } from '@/components/layout/AppHeader';
-import {
-  Card,
-  MockBanner,
-  SecondaryButton,
-  SectionHeader,
-} from '@/design-system/components';
+import { Card, SecondaryButton, SectionHeader } from '@/design-system/components';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
 
@@ -37,33 +43,115 @@ type PermissionStatus = 'granted' | 'denied' | 'blocked';
 interface PermissionEntry {
   key: string;
   icon: string;
-  initial: PermissionStatus;
+  /** Underlying Android permission(s). Empty = informational only. */
+  androidPerms: Permission[];
+}
+
+// Resolve the Android permission constants that exist on the current SDK.
+// We pick from PermissionsAndroid.PERMISSIONS defensively (some keys are
+// undefined on older SDK levels) so a missing constant never crashes.
+const P = PermissionsAndroid.PERMISSIONS;
+
+function perms(...keys: string[]): Permission[] {
+  return keys
+    .map((k) => (P as Record<string, Permission | undefined>)[k])
+    .filter((v): v is Permission => v != null);
 }
 
 const ENTRIES: PermissionEntry[] = [
-  { key: 'camera',    icon: 'camera',    initial: 'granted' },
-  { key: 'bluetooth', icon: 'bluetooth', initial: 'granted' },
-  { key: 'location',  icon: 'map-pin',   initial: 'denied' },
-  { key: 'storage',   icon: 'hard-drive', initial: 'granted' },
-  { key: 'phone',     icon: 'phone',     initial: 'blocked' },
+  { key: 'camera', icon: 'camera', androidPerms: perms('CAMERA') },
+  {
+    key: 'bluetooth',
+    icon: 'bluetooth',
+    androidPerms: perms('BLUETOOTH_CONNECT', 'BLUETOOTH_SCAN'),
+  },
+  {
+    key: 'location',
+    icon: 'map-pin',
+    androidPerms: perms('ACCESS_FINE_LOCATION'),
+  },
+  {
+    key: 'storage',
+    icon: 'hard-drive',
+    androidPerms: perms('WRITE_EXTERNAL_STORAGE', 'READ_EXTERNAL_STORAGE'),
+  },
+  { key: 'phone', icon: 'phone', androidPerms: perms('CALL_PHONE') },
 ];
 
 export function PermissionsScreen(): React.JSX.Element {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
-  // Mock state — Wave 6-Β will replace with real PermissionsAndroid.check().
   const [statuses, setStatuses] = useState<Record<string, PermissionStatus>>(
-    () => Object.fromEntries(ENTRIES.map((e) => [e.key, e.initial])),
+    () => Object.fromEntries(ENTRIES.map((e) => [e.key, 'granted'])),
   );
+  // Track which rows hit "never_ask_again" so we can show "blocked".
+  const blockedRef = useRef<Set<string>>(new Set());
+
+  const refreshStatuses = useCallback(async (): Promise<void> => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+    const next: Record<string, PermissionStatus> = {};
+    for (const entry of ENTRIES) {
+      if (entry.androidPerms.length === 0) {
+        next[entry.key] = 'granted';
+        continue;
+      }
+      const checks = await Promise.all(
+        entry.androidPerms.map((p) => PermissionsAndroid.check(p)),
+      );
+      const allGranted = checks.every(Boolean);
+      if (allGranted) {
+        next[entry.key] = 'granted';
+        blockedRef.current.delete(entry.key);
+      } else {
+        next[entry.key] = blockedRef.current.has(entry.key)
+          ? 'blocked'
+          : 'denied';
+      }
+    }
+    setStatuses(next);
+  }, []);
+
+  useEffect(() => {
+    void refreshStatuses();
+    const sub = AppState.addEventListener(
+      'change',
+      (s: AppStateStatus) => {
+        if (s === 'active') {
+          void refreshStatuses();
+        }
+      },
+    );
+    return () => sub.remove();
+  }, [refreshStatuses]);
 
   const requestPermission = (key: string): void => {
-    // TODO Wave 6-Β: call PermissionsAndroid.request(...) and update state.
-    setStatuses((prev) => ({ ...prev, [key]: 'granted' }));
+    const entry = ENTRIES.find((e) => e.key === key);
+    if (entry == null || entry.androidPerms.length === 0) {
+      return;
+    }
+    void (async () => {
+      const result = await PermissionsAndroid.requestMultiple(
+        entry.androidPerms,
+      );
+      const values = Object.values(result);
+      const allGranted = values.every(
+        (v) => v === PermissionsAndroid.RESULTS.GRANTED,
+      );
+      const anyBlocked = values.some(
+        (v) => v === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN,
+      );
+      if (anyBlocked && !allGranted) {
+        blockedRef.current.add(key);
+      }
+      await refreshStatuses();
+    })();
   };
 
   const openSystemSettings = (): void => {
-    // TODO Wave 6-Β: Linking.openSettings()
+    void Linking.openSettings();
   };
 
   const statusColor = (s: PermissionStatus): string =>
@@ -79,7 +167,6 @@ export function PermissionsScreen(): React.JSX.Element {
       edges={['top']}
     >
       <AppHeader title={t('settings.permissions.title')} showBack />
-      <MockBanner />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -90,7 +177,7 @@ export function PermissionsScreen(): React.JSX.Element {
 
         <Card variant="outlined" padding={0} style={styles.listCard}>
           {ENTRIES.map((entry, i) => {
-            const status = statuses[entry.key] ?? entry.initial;
+            const status = statuses[entry.key] ?? 'granted';
             return (
               <View
                 key={entry.key}

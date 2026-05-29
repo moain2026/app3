@@ -29,7 +29,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from 'react-native-vector-icons/Feather';
 
 import { AppHeader } from '@/components/layout/AppHeader';
-import { Card, MockBanner, SectionHeader } from '@/design-system/components';
+import { Card, SectionHeader } from '@/design-system/components';
 import { useTheme } from '@/design-system/theme';
 import { spacing } from '@/design-system/tokens/spacing';
 import type { MainStackParamList } from '@/navigation/types';
@@ -69,7 +69,6 @@ export function SettingsHubScreen(): React.JSX.Element {
       edges={['top']}
     >
       <AppHeader title={t('settings.hub.title')} showBack />
-      <MockBanner />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>

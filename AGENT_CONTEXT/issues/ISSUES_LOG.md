@@ -189,8 +189,29 @@
   - **(ب) طبقة ترجمة (adapter):** إبقاء النموذج الوهمي وإضافة تحويل في الـ mapper
     من حقول الأصلي إلى الوهمية. أسرع لكنه يُبقي ديوناً ويخاطر بفقدان حقول
     (nmstnd كنص، dain/mden، num_s...).
+- **القرار المُتّخذ:** **(أ) محاذاة كاملة مع السيرفر** — المستخدم رفض النموذج
+  الوهمي صراحةً: «نعم كالاصلي الوهمي لا اريده».
+- **التنفيذ (موجات):**
+  - **الموجة 1 — الحسابات (accounts):** ✅ مكتملة ومرفوعة (`9a59076`).
+    schema/migration(v2)/Model/DTO/mapper/pull/seed/viewModels صارت كلها بأسماء
+    `Accounts.java` (num/noadad/namet/namep/dain/mden/tel/type/nomstlm/notblh/nog).
+  - **الموجة 2 — السندات (bonds):** ✅ مكتملة ومرفوعة (`8f2b8eb`).
+    - `schema.ts`: جدول bonds → 24 عمود من ItemBonds؛ SCHEMA_VERSION 2→3.
+    - `migrations.ts`: ترحيلة v3 (drop+recreate bonds — جدول مرآة للقراءة).
+    - `models/Bond.ts`: حقول ItemBonds + getters توافقية (remoteId/bondNo/
+      bondType/amount/amountPaid/accountName/accountId/currencyId/bondDate/
+      remainingAmount/isFullyPaid) تُبقي الـ UI/vm شغّالة بلا تعديل.
+    - `schemas/lists.ts`: BondDtoSchema بحقول ItemBonds؛ BondPaymentDtoSchema=BondDtoSchema.
+    - `mappers/lists.mapper.ts`: BondDomain/parseBondList بأسماء الأصلي.
+    - `referencePullHandlers.ts`: bondPullHandler يكتب الأعمدة الجديدة (يطابق على num)؛
+      bondPaymentPullHandler يحوّل wire الـ ItemBonds إلى أعمدة bond_payments الحالية.
+    - `bondsRepository.ts`: الاستعلام/الترتيب على type(1=قبض)/name/nmstnd/num.
+    - `seedBonds.ts`: تحويل MockBond → أعمدة ItemBonds.
+  - **الموجة 3 (معلّقة):** محاذاة جدول bond_payments نفسه (حالياً ما زال wave-α
+    لكن مسار القراءة يعمل عبر التحويل أعلاه) + تنظيف الـ mocks + بناء بارامترات
+    الطلب لكل شاشة (id=NOU للقراءة، nou+sdate+edate+num_s للسندات).
 - **مرجع:** ISS-11، `SCREEN_ANALYSIS_OPERATIONS.md`، `database/schema.ts`،
-  `database/models/Bond.ts`.
+  `database/models/Bond.ts`، `database/models/Account.ts`.
 
 ---
 
